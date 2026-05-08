@@ -1,0 +1,31 @@
+name = "aerobroker-proxy"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+
+# After running `wrangler kv:namespace create RATE_LIMITS`, paste the returned id here.
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+[vars]
+# Lock this down to your GitHub Pages origin to prevent strangers from using your key
+# from arbitrary sites. Comma-separated for multiple. Use "*" for any (NOT RECOMMENDED).
+ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io"
+
+# Per-user daily request cap (best-effort, by client IP).
+MAX_REQUESTS_PER_IP_PER_DAY = "20"
+
+# Global daily request cap across all users — your hard ceiling.
+# At 1500 max output tokens, Sonnet output ~$15/M tokens, this caps worst-case output spend
+# at ~ (200 * 1500 / 1_000_000) * 15 = ~$4.50/day. Adjust to your tolerance.
+MAX_GLOBAL_REQUESTS_PER_DAY = "200"
+
+# Cap per-request tokens. Worker enforces min(client_value, this).
+MAX_TOKENS_PER_REQUEST = "1500"
+
+# Whitelist of models the worker will forward.
+ALLOWED_MODELS = "claude-sonnet-4-6,claude-haiku-4-5-20251001"
+
+# The Anthropic API key is set as a SECRET, not as a var. Run:
+#   wrangler secret put ANTHROPIC_API_KEY
+# (This is a one-time interactive prompt. Never commit the key to git.)

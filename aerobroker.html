@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AeroBroker — drone services broker prototype</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { height: 100%; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b1220; color: #e6edf7; }
+  .pane { background: #111a2e; border: 1px solid #1f2a44; border-radius: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; line-height: 1.4; border: 1px solid #2a3858; background: #18223a; color: #c8d4ee; }
+  .chip-on  { background: #1d3a2a; border-color: #2f6f4a; color: #b8f1cc; }
+  .chip-off { background: #2a1d1d; border-color: #6f2f2f; color: #f1bcbc; }
+  .chip-warn{ background: #2a261d; border-color: #6f5e2f; color: #f1e2bc; }
+  .row-line { border-top: 1px dashed #2a3858; }
+  .scroll { overflow-y: auto; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 8px; }
+  .msg-broker { background:#142244; border:1px solid #1f3666; }
+  .msg-user   { background:#23304a; border:1px solid #324870; }
+  .msg-system { background:#2a1d1d; border:1px solid #6f2f2f; color:#f3c8c8; font-size: 12px; }
+  .pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+  .typing { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #8aa1d4; margin: 0 1px; animation: typing 1.2s infinite; }
+  .typing:nth-child(2) { animation-delay: .15s; }
+  .typing:nth-child(3) { animation-delay: .3s; }
+  @keyframes typing { 0%,80%,100%{ transform: translateY(0); opacity:.3 } 40%{ transform: translateY(-3px); opacity:1 } }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background:#1c2742; border:1px solid #2a3858; padding:1px 5px; border-radius:4px; color:#bcd0f7; }
+  .grid-3 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.95fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr; } }
+  .pill-btn { padding: 4px 10px; border-radius: 999px; font-size: 12px; border: 1px solid #2a3858; background:#18223a; color:#c8d4ee; }
+  .pill-btn:hover { background:#1f2a44; }
+  .pill-btn.active { background:#1d3a2a; border-color:#2f6f4a; color:#b8f1cc; }
+  .modal { position: fixed; inset:0; background: rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal-card { background:#111a2e; border:1px solid #1f2a44; border-radius:12px; max-width: 640px; width: calc(100% - 32px); padding: 20px; }
+  textarea, input[type=text], input[type=password] { background:#0b1220; border:1px solid #2a3858; color:#e6edf7; border-radius:8px; padding:8px 10px; width:100%; font-size: 13px; }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .badge { display:inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; line-height:1.4; font-weight:600; letter-spacing: .02em; }
+  .badge-match  { background:#1d3a2a; color:#b8f1cc; border:1px solid #2f6f4a; }
+  .badge-maybe  { background:#2a261d; color:#f1e2bc; border:1px solid #6f5e2f; }
+  .badge-out    { background:#2a1d1d; color:#f1bcbc; border:1px solid #6f2f2f; }
+  .badge-neutral{ background:#18223a; color:#c8d4ee; border:1px solid #2a3858; }
+  .req-empty { color:#6c7ea3; font-style: italic; }
+  .req-filled { color:#e6edf7; }
+  .role-card { background:#0e1729; border:1px solid #213152; border-radius:10px; padding:10px; }
+</style>
+</head>
+<body>
+<div class="max-w-[1500px] mx-auto p-4 flex flex-col gap-3" style="min-height:100vh">
+
+  <!-- Header -->
+  <div class="pane p-3 flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-3">
+      <div class="text-2xl">🛰️</div>
+      <div>
+        <div class="text-lg font-semibold">AeroBroker</div>
+        <div class="text-xs text-slate-400 -mt-0.5">Drone services broker prototype · infrastructure inspection vertical</div>
+      </div>
+    </div>
+    <div class="flex-1"></div>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-slate-400 mr-1">Mode:</span>
+      <button id="mode-scripted" class="pill-btn active" title="Pre-baked dialogue, deterministic">Scripted</button>
+      <button id="mode-live"     class="pill-btn"        title="Calls the Claude API in your browser">Live Claude</button>
+    </div>
+    <div class="flex items-center gap-2 ml-2">
+      <span class="text-xs text-slate-400 mr-1">Scenario:</span>
+      <select id="scenario-picker" class="pill-btn" style="padding:6px 10px"></select>
+    </div>
+    <button id="reset-btn"    class="pill-btn">Reset</button>
+    <button id="settings-btn" class="pill-btn">Settings</button>
+  </div>
+
+  <!-- Main 3 columns -->
+  <div class="grid-3 flex-1" style="min-height: 0">
+
+    <!-- Conversation -->
+    <div class="pane p-3 flex flex-col" style="min-height: 560px">
+      <div class="flex items-center justify-between mb-2">
+        <div class="font-semibold">Consumer ↔ Broker</div>
+        <div id="mode-indicator" class="chip">scripted</div>
+      </div>
+      <div id="messages" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0"></div>
+      <div id="composer" class="mt-2 flex gap-2">
+        <button id="advance-btn" class="pill-btn active" style="padding:8px 14px">Next message ▸</button>
+        <input id="user-input" type="text" placeholder="Live mode: type as the consumer…" class="hidden" />
+        <button id="send-btn"  class="pill-btn hidden" style="padding:8px 14px">Send</button>
+      </div>
+      <div class="text-[11px] text-slate-500 mt-1">
+        Scripted mode: click <span class="kbd">Next message</span> to walk through the conversation. Live mode: type as the consumer; the broker is Claude with the catalog in its system prompt.
+      </div>
+    </div>
+
+    <!-- Requirements panel -->
+    <div class="pane p-3 flex flex-col" style="min-height: 560px">
+      <div class="font-semibold mb-2">Requirement spec <span class="text-xs text-slate-400 font-normal">— fills in as the broker elicits</span></div>
+      <div id="req-panel" class="scroll text-sm flex-1 pr-1" style="min-height:0"></div>
+      <details class="mt-3 text-xs text-slate-400">
+        <summary class="hover:text-slate-200">▸ schema notes</summary>
+        <div class="mt-2 leading-relaxed">
+          The <span class="kbd">RequirementSpec</span> is what the broker is trying to lock down before it can quote.
+          Each field has implications for cost and which providers can bid. Frequency drives recurring pricing;
+          regulatory needs (BVLOS, restricted airspace, night ops) drastically narrow the eligible provider pool.
+        </div>
+      </details>
+    </div>
+
+    <!-- Catalog + Job assembly -->
+    <div class="pane p-3 flex flex-col" style="min-height: 560px">
+      <div class="font-semibold mb-2">Provider catalog &amp; job assembly</div>
+      <div class="text-[11px] text-slate-400 mb-2">
+        <span class="badge badge-match">match</span>
+        <span class="badge badge-maybe">partial</span>
+        <span class="badge badge-out">out</span>
+        — the broker re-evaluates fit as requirements come in.
+      </div>
+      <div id="catalog" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0; max-height: 320px"></div>
+      <div class="row-line my-3"></div>
+      <div class="font-semibold mb-2">Proposed job assembly</div>
+      <div id="assembly" class="scroll text-sm pr-1" style="min-height:120px; max-height: 280px"></div>
+    </div>
+  </div>
+
+  <!-- Design notes -->
+  <details class="pane p-3 text-sm">
+    <summary class="font-semibold">▸ Design notes (for thinking through the model)</summary>
+    <div class="mt-3 grid md:grid-cols-2 gap-4 text-slate-300 leading-relaxed">
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">What the broker actually does</div>
+        <ol class="list-decimal pl-5 space-y-1">
+          <li><b>Elicit</b> requirements through a structured dialogue (asset, scope, frequency, regulatory needs, deliverables, budget, timeline).</li>
+          <li><b>Translate</b> business intent into <i>technical</i> requirements — resolution targets, sensors, post-processing, certifications.</li>
+          <li><b>Match</b> against the provider catalog, scoring each candidate and explaining trade-offs in plain English.</li>
+          <li><b>Assemble</b> a job — sometimes a single full-stack provider, sometimes a collector + processor split, sometimes 2 collectors + 1 processor.</li>
+          <li><b>Quote</b> with line-item pricing, alternatives, and the assumptions the quote is conditional on.</li>
+        </ol>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Core entities</div>
+        <ul class="list-disc pl-5 space-y-1">
+          <li><span class="kbd">Provider</span> — capabilities, certifications, geography, pricing model &amp; range, service modes (collection / processing / full-stack).</li>
+          <li><span class="kbd">RequirementSpec</span> — the structured spec the broker is filling in.</li>
+          <li><span class="kbd">JobAssembly</span> — roles (collection, processing, certification, ground crew), assigned provider per role, totals, alternatives, risks.</li>
+          <li><span class="kbd">Quote</span> — versioned snapshot of an assembly with line items, valid-through, T&amp;Cs.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Why a broker (not a marketplace)</div>
+        <p>Marketplaces work when the consumer already knows what they need. Drone services consumers
+          almost never do — they know the <i>outcome</i> they want (e.g. "annual structural assessment of these
+          40 bridges with engineer-stamped reports"), and the broker's value is translating that into a procurable
+          spec, then orchestrating providers. The conversation IS the product.</p>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Open questions worth chewing on</div>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Who holds liability when output fails QA — broker, collector, or processor?</li>
+          <li>How is provider capacity reserved during the quote window?</li>
+          <li>What's the data handoff format between collector and processor, and who owns it?</li>
+          <li>How are recurring jobs re-bid — annually, or locked for the term?</li>
+          <li>Does the broker take a fixed % cut, or value-priced on savings vs. baseline?</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="flex items-center justify-between mb-3">
+      <div class="font-semibold">Settings</div>
+      <button id="settings-close" class="pill-btn">✕</button>
+    </div>
+    <div class="text-sm text-slate-300 space-y-3">
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Live Claude mode</div>
+        <p class="text-xs text-slate-400 mb-2">
+          Live mode can route through a shared proxy (preferred for public deployments) or call
+          <span class="kbd">api.anthropic.com</span> directly with your own key. If a proxy URL is set, the API key is ignored.
+        </p>
+        <label class="block text-xs text-slate-400 mb-1">Backend proxy URL <span class="text-slate-500">(optional)</span></label>
+        <input id="proxy-url" type="text" placeholder="https://aerobroker-proxy.your-subdomain.workers.dev/v1/messages" autocomplete="off" />
+        <p class="text-[11px] text-slate-500 mt-1">If set, all visitors share the proxy's API key with rate limits enforced server-side. See <span class="kbd">proxy/DEPLOY.md</span>.</p>
+
+        <label class="block text-xs text-slate-400 mt-3 mb-1">Anthropic API key <span class="text-slate-500">(only used when no proxy URL is set)</span></label>
+        <input id="api-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
+        <p class="text-[11px] text-slate-500 mt-1">Stays in this page's memory only — never persisted.</p>
+
+        <label class="block text-xs text-slate-400 mt-3 mb-1">Model</label>
+        <input id="api-model" type="text" value="claude-sonnet-4-6" />
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Broker system prompt (editable)</div>
+        <p class="text-xs text-slate-400 mb-2">The catalog is appended automatically. Edit the role description to experiment.</p>
+        <textarea id="system-prompt" rows="10"></textarea>
+      </div>
+      <div class="flex justify-end">
+        <button id="settings-save" class="pill-btn active" style="padding:6px 14px">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// PROXY CONFIG
+// Set DEFAULT_PROXY_URL to your deployed Cloudflare Worker URL + "/v1/messages"
+// to make Live Claude mode available to all visitors without their own API key.
+// Leave empty to require visitors to bring their own key in Settings.
+// See proxy/DEPLOY.md for setup instructions.
+// =====================================================================
+const DEFAULT_PROXY_URL = "";
+
+// =====================================================================
+// CATALOG  — 7 mock providers covering the infrastructure inspection space
+// =====================================================================
+const CATALOG = [
+  {
+    id: "apex",
+    name: "Apex Tower Pros",
+    blurb: "Telecom tower specialist. Drone + climber crews, RAD/RF inspection reports.",
+    capabilities: ["visual4k","thermal","rfScan"],
+    certifications: ["faaPart107"],
+    specialties: ["towers","monopole","selfSupport"],
+    serviceModes: ["fullStack"],
+    geography: ["TX","OK","NM","AR"],
+    pricing: { unit: "tower", low: 600, high: 1200, reportingFlat: [1500, 3500] },
+    capacity: "Up to 30 towers/month per region"
+  },
+  {
+    id: "skyguard",
+    name: "SkyGuard Inspections",
+    blurb: "Generalist Part-107 collector. Reliable visual + thermal collection on small assets.",
+    capabilities: ["visual4k","thermal"],
+    certifications: ["faaPart107"],
+    specialties: ["towers","bridges","substations","smallAssets"],
+    serviceModes: ["collection","fullStack"],
+    geography: ["TX","OK","LA","national-on-quote"],
+    pricing: { unit: "asset", low: 400, high: 900, reportingFlat: [1500, 2500] },
+    capacity: "High — 200+ assets/month nationwide via subcontractors"
+  },
+  {
+    id: "bridgeview",
+    name: "BridgeView Drone Co",
+    blurb: "Bridge specialist. Photogrammetry, 3D models, PE-stamped engineering reports.",
+    capabilities: ["visual4k","visual8k","photogrammetry","lidarLight"],
+    certifications: ["faaPart107","stampedEngineerReport"],
+    specialties: ["bridges","overpasses","damInfra"],
+    serviceModes: ["fullStack"],
+    geography: ["national"],
+    pricing: { unit: "bridge", low: 2500, high: 5000 },
+    capacity: "Schedules 3–6 weeks out"
+  },
+  {
+    id: "highline",
+    name: "HighLine Aerial",
+    blurb: "Premium BVLOS operator. Long-corridor transmission flights with thermal + LiDAR.",
+    capabilities: ["visual4k","thermal","lidar","multispectral"],
+    certifications: ["faaPart107","bvlosWaiver","nightOps"],
+    specialties: ["transmissionLines","longCorridor"],
+    serviceModes: ["collection"],
+    geography: ["national"],
+    pricing: { unit: "mile", low: 1800, high: 2500 },
+    capacity: "Limited — books 2–3 months out"
+  },
+  {
+    id: "volt",
+    name: "Volt Drone Services",
+    blurb: "Distribution &amp; transmission line collector. No BVLOS but cost-effective per mile.",
+    capabilities: ["visual4k","thermal"],
+    certifications: ["faaPart107"],
+    specialties: ["transmissionLines","distributionLines"],
+    serviceModes: ["collection"],
+    geography: ["TX","NM","CO","KS","NE","OK"],
+    pricing: { unit: "mile", low: 900, high: 1400 },
+    capacity: "Good — 60–80 mi/wk per crew, multiple crews"
+  },
+  {
+    id: "aeroprocess",
+    name: "AeroProcess AI",
+    blurb: "Processing-only. AI defect detection, thermal anomaly classification, 3D reconstruction.",
+    capabilities: ["aiDefectDetection","thermalAnomaly","photogrammetry","reportGen"],
+    certifications: ["soc2"],
+    specialties: ["processing","analytics"],
+    serviceModes: ["processing"],
+    geography: ["any"],
+    pricing: { unit: "image", low: 0.4, high: 2.0, setupFlat: [25000, 60000] },
+    capacity: "Elastic"
+  },
+  {
+    id: "geodata",
+    name: "GeoData Solutions",
+    blurb: "Survey-grade LiDAR + GIS deliverables. Strong on precise spatial outputs.",
+    capabilities: ["lidar","photogrammetry","gisDelivery","reportGen"],
+    certifications: ["faaPart107","plsLicensed"],
+    specialties: ["bridges","corridors","gisProcessing"],
+    serviceModes: ["processing","fullStack"],
+    geography: ["national"],
+    pricing: { unit: "asset", low: 1200, high: 2500 },
+    capacity: "Moderate"
+  }
+];
+
+// =====================================================================
+// REQUIREMENT SPEC TEMPLATE
+// =====================================================================
+function emptyReqSpec() {
+  return {
+    consumer:       { value: null, label: "Consumer" },
+    assetType:      { value: null, label: "Asset type" },
+    assetCount:     { value: null, label: "Asset count" },
+    location:       { value: null, label: "Location" },
+    frequency:      { value: null, label: "Frequency" },
+    scope:          { value: null, label: "Scope of collection" },
+    sensors:        { value: null, label: "Sensors required" },
+    deliverables:   { value: null, label: "Deliverables" },
+    accuracy:       { value: null, label: "Accuracy / resolution" },
+    regulatory:     { value: null, label: "Regulatory needs" },
+    budget:         { value: null, label: "Budget" },
+    timeline:       { value: null, label: "Timeline" },
+    notes:          { value: null, label: "Notes" }
+  };
+}
+
+// =====================================================================
+// SCRIPTED SCENARIOS
+// Each step: { broker, user, reqUpdates, catalogTags, assembly }
+// catalogTags: { providerId: 'match' | 'maybe' | 'out' }
+// assembly: full replacement object (or null to leave alone)
+// =====================================================================
+
+const SCENARIOS = {
+  cell_towers: {
+    title: "Cell tower portfolio (simple, single provider)",
+    consumer: "Sage Telecom",
+    steps: [
+      {
+        broker: "Hi — I'm AeroBroker. Tell me about what you need inspected and we'll work through the technical requirements together.",
+        user: "Hey. We're a regional telecom and we need an annual inspection program for our cell tower portfolio in central Texas.",
+        reqUpdates: { consumer: "Sage Telecom (regional telecom operator)", assetType: "Cell towers (monopole)", location: "Central Texas (Austin/Waco/Temple)", frequency: "Annual" },
+        catalogTags: { apex:"match", skyguard:"match", bridgeview:"out", highline:"out", volt:"out", aeroprocess:"maybe", geodata:"maybe" }
+      },
+      {
+        broker: "Got it. A few quick scoping questions: how many towers, and roughly what mix of types? Are we doing visual structural inspection only, or also thermal on the radios and RF/RAD compliance work?",
+        user: "12 towers, all monopoles. We need structural assessment for FCC reporting plus thermal on the radio heads. And yes — RAD compliance per OSHA needs to be in the package.",
+        reqUpdates: {
+          assetCount: "12 monopole towers",
+          scope: "Structural assessment + thermal scan of radio heads + RAD compliance survey",
+          sensors: "4K visual + thermal (radiometric)",
+          deliverables: "Per-tower inspection report (PDF) + RAD compliance certificate + thermal anomaly summary",
+          regulatory: "OSHA RAD compliance documentation; FCC-style structural reporting"
+        },
+        catalogTags: { apex:"match", skyguard:"maybe", bridgeview:"out", highline:"out", volt:"out", aeroprocess:"maybe", geodata:"out" }
+      },
+      {
+        broker: "RAD work is the deciding factor here. SkyGuard can collect imagery just fine, but they don't have the climber crew or the in-house RAD certification — you'd be coordinating that yourself. Apex Tower Pros does both in one engagement. What's the budget envelope and when do you want this done by?",
+        user: "Budget is $20–30k for the year. We'd like the program to wrap by end of Q3.",
+        reqUpdates: { budget: "$20,000–$30,000 (annual program)", timeline: "Complete by end of Q3 (≈5 months out)" }
+      },
+      {
+        broker: "Comfortable space — your budget is enough that you don't have to optimize aggressively. My recommendation is a single-provider engagement with Apex: drone collection, climber follow-up where needed, RAD measurement, and one consolidated deliverable per tower. Estimated: $850/tower × 12 = $10.2k, plus $2.5k for the consolidated report and RAD certs. Total ~$12.7k. That leaves headroom for a mid-year drive-by check on any flagged towers if you want it.",
+        user: "Yes, build in the mid-year re-check option as an optional line item.",
+        reqUpdates: { notes: "Include optional mid-year re-check on flagged towers as Add-On line item." },
+        assembly: {
+          recommended: {
+            roles: [
+              { role: "Collection + climber crew + RAD",  provider: "apex", line: "12 × $850 = $10,200" },
+              { role: "Consolidated reporting + RAD cert", provider: "apex", line: "Flat $2,500" }
+            ],
+            addOns: [
+              { label: "Optional: mid-year re-check on flagged towers", line: "$350 × N (T&M)" }
+            ],
+            total: "$12,700 base · plus optional re-check",
+            timeline: "5–7 weeks scheduled, 3 weeks active fieldwork",
+            why: "Apex bundles drone + climber + RAD in one engagement, eliminating handoff risk and double-mobilization fees."
+          },
+          alternatives: [
+            {
+              label: "SkyGuard collect + 3rd-party RAD vendor",
+              total: "≈ $11,800 + RAD vendor (TBD)",
+              risk: "Cheaper sticker price, but you'd manage two contracts and the RAD vendor mobilization eats most of the savings."
+            }
+          ]
+        }
+      },
+      {
+        broker: "I'll generate the formal quote and send Apex's availability for the first 4 towers next week. Anything else to fold in — a portal for the deliverables, or a specific report template you already use?",
+        user: "Use our existing report template — I'll send it. And yes, deliverables in our portal please."
+      },
+      { broker: "Perfect. End of conversation for this scripted scenario. Switch the scenario picker above to walk through a more complex one (multi-provider transmission line corridor)." }
+    ]
+  },
+
+  bridges: {
+    title: "County DOT bridge inventory (integrated vs. split trade-off)",
+    consumer: "Travis County DOT",
+    steps: [
+      {
+        broker: "Welcome — what's the inspection need?",
+        user: "We're Travis County DOT. We have a 40-bridge inventory due for biennial inspection. Past cycles we've done it manually with bucket trucks. We want to try a drone-based program this cycle.",
+        reqUpdates: {
+          consumer: "Travis County DOT",
+          assetType: "Highway bridges (mixed: concrete girder, steel truss, slab)",
+          assetCount: "40 bridges",
+          location: "Travis County, TX",
+          frequency: "Biennial (this is the 2026 cycle)"
+        },
+        catalogTags: { apex:"out", skyguard:"maybe", bridgeview:"match", highline:"out", volt:"out", aeroprocess:"maybe", geodata:"match" }
+      },
+      {
+        broker: "Two big scoping questions before we go further. First — what's the deliverable that has to land on your engineers' desks? And second — does the inspection of record need a PE stamp, or is the drone work feeding a PE who's already on contract with the county?",
+        user: "Deliverable: 3D photogrammetry model per bridge, defect annotations, and a written engineering assessment. We'd love a single PE-stamped report per bridge so the inspection-of-record obligation is fully discharged.",
+        reqUpdates: {
+          scope: "Visual + photogrammetry of each bridge; defect identification (spalling, cracking, corrosion, scour signs)",
+          sensors: "4K/8K visual + photogrammetry capture",
+          deliverables: "3D model (LAS/OBJ + web viewer) + defect-annotated report + PE-stamped engineering assessment per bridge",
+          accuracy: "≤1cm defect resolution at typical girder distances",
+          regulatory: "PE stamp required on each report"
+        },
+        catalogTags: { apex:"out", skyguard:"maybe", bridgeview:"match", highline:"out", volt:"out", aeroprocess:"maybe", geodata:"match" }
+      },
+      {
+        broker: "Budget envelope and timeline?",
+        user: "Budget $150–200k for the cycle. Timeline: complete within 5 months so the reports land before our December board cycle.",
+        reqUpdates: { budget: "$150,000–$200,000", timeline: "5 months — reports needed by November" }
+      },
+      {
+        broker: "Two real options here, and they're a meaningful trade-off worth showing you.\n\n• Integrated: BridgeView Drone Co does the whole stack (collect → model → PE-stamped report) at ~$3,800/bridge × 40 = $152k. They own the schedule and the QA, and there's no handoff risk. It fits cleanly inside your envelope.\n\n• Split: SkyGuard collects ($800/bridge × 40 = $32k), GeoData Solutions processes and PE-stamps ($1,800/bridge × 40 = $72k). Total $104k — about $48k cheaper. The catch: I (the broker) would be coordinating the data handoff and you'd be on the hook if collected imagery doesn't meet GeoData's processing spec, which would mean re-flights.\n\nWhich way do you want to lean — risk-minimized or cost-optimized?",
+        user: "Cost-optimized but with the broker actually managing the handoff and standing behind the spec. We don't want to manage two vendors.",
+        reqUpdates: { notes: "Cost-optimized split path. Broker owns data handoff & re-fly risk." },
+        assembly: {
+          recommended: {
+            roles: [
+              { role: "Field collection (40 bridges)",         provider: "skyguard",   line: "40 × $800 = $32,000" },
+              { role: "Processing + PE-stamped reports",       provider: "geodata",    line: "40 × $1,800 = $72,000" },
+              { role: "Broker QA + handoff + re-fly insurance", provider: null,        line: "10% mgmt fee = $10,400" }
+            ],
+            addOns: [],
+            total: "$114,400  ·  ~$37k under budget",
+            timeline: "16 weeks: 8 weeks collection (overlapping), 6 weeks processing, 2 weeks final review",
+            why: "Cheaper than integrated; broker absorbs handoff risk for a 10% management fee. Comparable engineering quality — GeoData's PE network is well-credentialed."
+          },
+          alternatives: [
+            {
+              label: "Integrated: BridgeView end-to-end",
+              total: "≈ $152,000",
+              risk: "Higher cost but zero handoff risk, single point of QA, faster turnaround (10 weeks total)."
+            }
+          ]
+        }
+      },
+      {
+        broker: "I'll lock SkyGuard's collection windows and pre-validate their data outputs against GeoData's ingest spec before fieldwork starts — that's the failure mode we have to head off. End of scripted scenario."
+      }
+    ]
+  },
+
+  transmission: {
+    title: "230kV transmission corridor — multi-provider orchestration",
+    consumer: "Sierra Power & Light",
+    steps: [
+      {
+        broker: "What are we inspecting?",
+        user: "We're Sierra Power & Light. We need an annual inspection of a 200-mile 230kV transmission corridor running from west Texas into eastern New Mexico. Mostly semi-rural with some federal land crossings. We want thermal anomaly detection, visual condition assessment, and AI-driven defect prioritization.",
+        reqUpdates: {
+          consumer: "Sierra Power & Light (utility)",
+          assetType: "230kV transmission line corridor",
+          assetCount: "200 miles (~1,400 structures)",
+          location: "West TX → eastern NM, semi-rural + federal land crossings",
+          frequency: "Annual",
+          scope: "Thermal anomaly scan + visual condition + AI-driven defect prioritization across all structures"
+        },
+        catalogTags: { apex:"out", skyguard:"out", bridgeview:"out", highline:"match", volt:"match", aeroprocess:"match", geodata:"maybe" }
+      },
+      {
+        broker: "A few critical specifics: do you have a BVLOS waiver path, or do we need to fly visual line of sight throughout? And how strict is the thermal radiometric requirement — are you trying to catch incipient hot spots (≤2°C delta) or just frank failures?",
+        user: "We don't have a BVLOS waiver, and getting one for the federal-land segments is unrealistic in this cycle. Thermal needs to catch incipient — we want ≤2°C delta on conductor splices. Reporting needs to roll up to NERC FAC-008 inventory format.",
+        reqUpdates: {
+          sensors: "Radiometric thermal (≤2°C sensitivity) + 4K visual",
+          accuracy: "Per-structure GPS tagging; thermal ≤2°C delta",
+          regulatory: "BVLOS not available customer-side. Federal land crossings require coordination. NERC FAC-008 inventory format for deliverables.",
+          deliverables: "AI-prioritized defect list + per-structure imagery + NERC FAC-008 inventory rollup"
+        }
+      },
+      {
+        broker: "Budget and timeline?",
+        user: "$250–350k. Timeline: complete in 4 months, with the report ready to feed our fall vegetation/maintenance planning cycle.",
+        reqUpdates: { budget: "$250,000–$350,000", timeline: "4 months — output feeds fall maintenance planning" }
+      },
+      {
+        broker: "This needs to be a multi-provider job. Here's why: about 60 of your 200 miles are federal-land or otherwise restricted segments where only an operator with a current BVLOS waiver can fly efficiently — that's HighLine Aerial, premium pricing. The remaining 140 miles are accessible enough for visual-line-of-sight crews, where Volt Drone Services is much cheaper per mile. Both are collection-only, so we route everything to AeroProcess AI for unified processing and AI defect detection — that way you get one consistent prioritized defect list rather than two reports in different formats.",
+        user: "OK that makes sense. Walk me through the cost.",
+        reqUpdates: { notes: "Multi-provider: HighLine for restricted miles, Volt for accessible miles, AeroProcess for unified processing." }
+      },
+      {
+        broker: "Estimate:\n• HighLine Aerial — 60 miles BVLOS/restricted at $2,200/mi = $132,000\n• Volt Drone Services — 140 miles VLOS at $1,100/mi = $154,000\n• AeroProcess AI — processing setup $35k + ~30k images at $0.50 = $50,000\n• Broker orchestration, federal land coordination, unified data spec = 8% = $26,880\n\nTotal ≈ $362,880, just over your top end. Two ways to bring it in: either accept thermal-only on the 140 accessible miles (visual stays light), saving ≈ $40k; or switch every-other-year cadence on visual for the easy segments, alternating with thermal-only years.",
+        user: "Go with thermal-only on the accessible miles for visual. That's the right cost/value trade for that geography.",
+        reqUpdates: { scope: "Full thermal across all 200 mi. Visual: full on restricted 60 mi; thermal-only on accessible 140 mi (re-evaluate year-over-year)." },
+        assembly: {
+          recommended: {
+            roles: [
+              { role: "Collection — 60 mi BVLOS / restricted", provider: "highline",    line: "60 mi × $2,200 = $132,000" },
+              { role: "Collection — 140 mi VLOS (thermal-led)", provider: "volt",        line: "140 mi × $900 (thermal-only) = $126,000" },
+              { role: "Processing + AI defect detection",       provider: "aeroprocess", line: "$35k setup + ~22k images × $0.50 = $46,000" },
+              { role: "Broker orchestration + federal coordination + unified spec", provider: null, line: "8% mgmt = $24,320" }
+            ],
+            addOns: [
+              { label: "Add full visual on accessible miles next year (alternating)", line: "+$28,000 in alternate years" }
+            ],
+            total: "$328,320  ·  inside budget envelope",
+            timeline: "16 weeks: parallel collection (HighLine 8 wks, Volt 6 wks), processing 4 wks, NERC rollup + QA 2 wks",
+            why: "BVLOS-only operator on the segments that require it; cheap per-mile operator everywhere else; single processor ensures one consistent defect list and NERC-formatted output. Trades full visual on accessible miles for budget fit; thermal coverage stays 100%."
+          },
+          alternatives: [
+            {
+              label: "Single-vendor (HighLine end-to-end)",
+              total: "≈ $510,000",
+              risk: "Cleanest contract, well over budget; HighLine's premium pricing applies to all 200 miles even where it isn't needed."
+            },
+            {
+              label: "All-Volt with no BVLOS",
+              total: "≈ $185,000 + waiver/permit risk",
+              risk: "Federal-land segments require ground crews and special-use permits — schedule slips into next fiscal cycle. Likely under-deliver."
+            }
+          ]
+        }
+      },
+      {
+        broker: "Last thing — I'll write the data spec that both HighLine and Volt have to deliver to (file format, GPS tagging, thermal radiometric calibration), and I'll pre-validate a sample flight from each before they go full-scale. Re-flight risk on a corridor this long is the thing that blows up budgets, so we're going to be paranoid up front. End of scripted scenario."
+      }
+    ]
+  }
+};
+
+// =====================================================================
+// STATE
+// =====================================================================
+let state = {
+  mode: "scripted",                   // 'scripted' | 'live'
+  scenarioKey: "cell_towers",
+  stepIdx: 0,                         // index of NEXT step to advance to
+  messages: [],                       // {role: 'broker'|'user'|'system', text}
+  reqSpec: emptyReqSpec(),
+  catalogTags: {},                    // { providerId: 'match'|'maybe'|'out' }
+  assembly: null,                     // current proposed assembly
+  apiKey: "",
+  proxyUrl: DEFAULT_PROXY_URL,        // if set, Live mode calls this instead of api.anthropic.com
+  model: "claude-sonnet-4-6",
+  systemPrompt: defaultSystemPrompt()
+};
+
+function defaultSystemPrompt() {
+  return `You are AeroBroker, an expert intermediary between consumers of drone services (corporations, governments, individuals) and a network of drone service providers.
+
+Your job in this conversation:
+1. Elicit the consumer's needs through a structured but natural dialogue. Ask one focused question at a time.
+2. Translate business intent into TECHNICAL requirements (asset type, scope, frequency, sensors, accuracy, deliverables, regulatory needs, budget, timeline).
+3. Match the requirements against the provider catalog (provided below). Recommend single-provider OR multi-provider job assemblies. Be honest about trade-offs.
+4. When you have enough to quote, propose a job assembly with line-item costs and at least one alternative.
+
+You operate in the infrastructure inspection vertical for this prototype: towers, power lines, bridges.
+
+After each of your replies, emit a JSON block on its own lines, between <UPDATE> and </UPDATE> tags, containing any updates to the requirement spec, catalog tagging, or proposed assembly. Schema:
+<UPDATE>
+{
+  "reqUpdates": { "<fieldName>": "<value>", ... },           // optional
+  "catalogTags": { "<providerId>": "match"|"maybe"|"out" },  // optional
+  "assembly": { ... }                                         // optional, see schema in your context
+}
+</UPDATE>
+
+If you have nothing to update, omit the tags entirely.
+
+Field names you may set in reqUpdates: consumer, assetType, assetCount, location, frequency, scope, sensors, deliverables, accuracy, regulatory, budget, timeline, notes.
+
+Provider IDs: ${CATALOG.map(p=>p.id).join(", ")}.`;
+}
+
+// =====================================================================
+// RENDERING
+// =====================================================================
+const $ = (id) => document.getElementById(id);
+
+function renderMessages() {
+  const el = $("messages");
+  el.innerHTML = "";
+  for (const m of state.messages) {
+    const div = document.createElement("div");
+    if (m.role === "broker") {
+      div.className = "msg-broker rounded-lg p-3 text-sm";
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">AeroBroker</div><div class="whitespace-pre-wrap">${escapeHtml(m.text)}</div>`;
+    } else if (m.role === "user") {
+      div.className = "msg-user rounded-lg p-3 text-sm self-end max-w-[90%]";
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">${escapeHtml(currentScenario()?.consumer || "Consumer")}</div><div class="whitespace-pre-wrap">${escapeHtml(m.text)}</div>`;
+    } else if (m.role === "thinking") {
+      div.className = "msg-broker rounded-lg p-3 text-sm pulse";
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">AeroBroker</div><div><span class="typing"></span><span class="typing"></span><span class="typing"></span></div>`;
+    } else {
+      div.className = "msg-system rounded-lg p-2";
+      div.textContent = m.text;
+    }
+    el.appendChild(div);
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderReq() {
+  const el = $("req-panel");
+  el.innerHTML = "";
+  for (const k of Object.keys(state.reqSpec)) {
+    const f = state.reqSpec[k];
+    const row = document.createElement("div");
+    row.className = "py-1.5 row-line first:border-t-0 first:pt-0";
+    row.innerHTML = `
+      <div class="text-[11px] uppercase tracking-wide text-slate-400">${escapeHtml(f.label)}</div>
+      <div class="${f.value ? 'req-filled' : 'req-empty'} text-sm leading-snug">${f.value ? escapeHtml(f.value) : "—"}</div>
+    `;
+    el.appendChild(row);
+  }
+}
+
+function renderCatalog() {
+  const el = $("catalog");
+  el.innerHTML = "";
+  for (const p of CATALOG) {
+    const tag = state.catalogTags[p.id] || null;
+    const badge = tag === "match"  ? `<span class="badge badge-match">match</span>`
+              :   tag === "maybe"  ? `<span class="badge badge-maybe">partial</span>`
+              :   tag === "out"    ? `<span class="badge badge-out">out</span>`
+              :                       `<span class="badge badge-neutral">—</span>`;
+    const card = document.createElement("div");
+    card.className = "role-card";
+    const certs = p.certifications.map(c => `<span class="chip">${c}</span>`).join("");
+    const caps  = p.capabilities.map(c => `<span class="chip">${c}</span>`).join("");
+    const modes = p.serviceModes.map(c => `<span class="chip">${c}</span>`).join("");
+    const price = p.pricing.unit
+      ? `$${p.pricing.low.toLocaleString()}–$${p.pricing.high.toLocaleString()} / ${p.pricing.unit}`
+      : "custom";
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
+          <div class="text-xs text-slate-400">${p.blurb}</div>
+        </div>
+        ${badge}
+      </div>
+      <div class="flex flex-wrap gap-1 mt-2">${caps}${certs}${modes}</div>
+      <div class="text-[11px] text-slate-400 mt-2">Pricing: ${price} · Geo: ${p.geography.join(", ")}</div>
+      <div class="text-[11px] text-slate-500">Capacity: ${p.capacity}</div>
+    `;
+    el.appendChild(card);
+  }
+}
+
+function renderAssembly() {
+  const el = $("assembly");
+  if (!state.assembly) {
+    el.innerHTML = `<div class="text-slate-500 italic text-sm">No proposed assembly yet — the broker will draft one as requirements firm up.</div>`;
+    return;
+  }
+  const a = state.assembly.recommended;
+  const altsHtml = (state.assembly.alternatives || []).map(x => `
+    <div class="row-line pt-2 mt-2 text-xs">
+      <div class="font-semibold text-slate-200">${escapeHtml(x.label)}</div>
+      <div class="text-slate-400">Cost: ${escapeHtml(x.total)}</div>
+      <div class="text-slate-400">${escapeHtml(x.risk || x.note || "")}</div>
+    </div>`).join("");
+  const rolesHtml = (a.roles || []).map(r => {
+    const provName = r.provider ? (CATALOG.find(p=>p.id===r.provider)?.name || r.provider) : "Broker / N/A";
+    return `<div class="flex items-start gap-2 py-1">
+              <div class="text-[11px] uppercase tracking-wide text-slate-400 w-44 flex-shrink-0">${escapeHtml(r.role)}</div>
+              <div class="flex-1 text-sm">
+                <div>${escapeHtml(provName)}</div>
+                <div class="text-xs text-slate-400">${escapeHtml(r.line)}</div>
+              </div>
+            </div>`;
+  }).join("");
+  const addOnsHtml = (a.addOns||[]).map(x => `<div class="text-xs text-slate-400">• ${escapeHtml(x.label)} — ${escapeHtml(x.line)}</div>`).join("");
+  el.innerHTML = `
+    <div class="text-sm">
+      ${rolesHtml}
+      ${addOnsHtml ? `<div class="row-line pt-2 mt-2"><div class="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Add-ons</div>${addOnsHtml}</div>` : ""}
+      <div class="row-line pt-2 mt-2">
+        <div class="font-semibold">Total: <span class="text-emerald-300">${escapeHtml(a.total || "")}</span></div>
+        <div class="text-xs text-slate-400">Timeline: ${escapeHtml(a.timeline || "")}</div>
+        <div class="text-xs text-slate-300 mt-1"><b>Why:</b> ${escapeHtml(a.why || "")}</div>
+      </div>
+      ${altsHtml ? `<div class="row-line pt-2 mt-2"><div class="text-[11px] uppercase tracking-wide text-slate-400">Alternatives considered</div>${altsHtml}</div>` : ""}
+    </div>`;
+}
+
+function renderModeIndicator() {
+  const el = $("mode-indicator");
+  if (state.mode === "scripted") {
+    el.textContent = `scripted · ${currentScenario()?.title || ""}`;
+    el.className = "chip";
+  } else if (state.proxyUrl) {
+    el.textContent = "live · via shared proxy";
+    el.className = "chip chip-on";
+  } else if (state.apiKey) {
+    el.textContent = "live · your API key";
+    el.className = "chip chip-on";
+  } else {
+    el.textContent = "live · NO PROXY OR KEY (set in Settings)";
+    el.className = "chip chip-warn";
+  }
+}
+
+function renderAll() {
+  renderMessages();
+  renderReq();
+  renderCatalog();
+  renderAssembly();
+  renderModeIndicator();
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function currentScenario() { return SCENARIOS[state.scenarioKey]; }
+
+// =====================================================================
+// SCRIPTED FLOW
+// =====================================================================
+function applyStep(step) {
+  if (step.reqUpdates) {
+    for (const [k,v] of Object.entries(step.reqUpdates)) {
+      if (state.reqSpec[k]) state.reqSpec[k].value = v;
+    }
+  }
+  if (step.catalogTags) {
+    state.catalogTags = { ...state.catalogTags, ...step.catalogTags };
+  }
+  if (step.assembly) {
+    state.assembly = step.assembly;
+  }
+}
+
+function advanceScripted() {
+  const sc = currentScenario();
+  if (!sc) return;
+  const step = sc.steps[state.stepIdx];
+  if (!step) {
+    state.messages.push({ role: "system", text: "End of scenario. Pick another scenario or hit Reset." });
+    renderAll();
+    return;
+  }
+  if (step.broker) state.messages.push({ role: "broker", text: step.broker });
+  applyStep(step);
+  renderAll();
+  // Auto-render the user reply on the next click — actually, render it now after a small delay for theatricality:
+  if (step.user) {
+    setTimeout(() => {
+      state.messages.push({ role: "user", text: step.user });
+      renderMessages();
+    }, 350);
+  }
+  state.stepIdx++;
+}
+
+// =====================================================================
+// LIVE CLAUDE FLOW
+// =====================================================================
+async function sendLive(userText) {
+  const usingProxy = !!state.proxyUrl;
+  if (!usingProxy && !state.apiKey) {
+    state.messages.push({ role: "system", text: "Live mode needs either a proxy URL or your own API key. Open Settings to set one, or switch to Scripted mode." });
+    renderMessages();
+    return;
+  }
+  state.messages.push({ role: "user", text: userText });
+  state.messages.push({ role: "thinking", text: "" });
+  renderMessages();
+
+  const apiMessages = state.messages
+    .filter(m => m.role === "user" || m.role === "broker")
+    .map(m => ({ role: m.role === "broker" ? "assistant" : "user", content: m.text }));
+
+  const fullSystemPrompt = state.systemPrompt + "\n\n# PROVIDER CATALOG\n" + JSON.stringify(CATALOG, null, 2)
+    + "\n\n# CURRENT REQUIREMENT SPEC\n" + JSON.stringify(snapshotReq(), null, 2)
+    + "\n\n# CURRENT ASSEMBLY\n" + JSON.stringify(state.assembly, null, 2);
+
+  const url = usingProxy ? state.proxyUrl : "https://api.anthropic.com/v1/messages";
+  const headers = usingProxy
+    ? { "content-type": "application/json" }
+    : {
+        "x-api-key": state.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+        "content-type": "application/json"
+      };
+
+  let text = "";
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: state.model,
+        max_tokens: 1500,
+        system: fullSystemPrompt,
+        messages: apiMessages
+      })
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      // Try to parse a structured error from the proxy
+      let parsed = null;
+      try { parsed = JSON.parse(errText); } catch {}
+      const friendly = parsed?.error || errText.slice(0, 300);
+      throw new Error((usingProxy ? "Proxy " : "API ") + "error " + resp.status + ": " + friendly);
+    }
+    const data = await resp.json();
+    text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+  } catch (e) {
+    state.messages = state.messages.filter(m => m.role !== "thinking");
+    state.messages.push({ role: "system", text: "Live call failed: " + e.message + "  · Switch to Scripted mode if needed." });
+    renderMessages();
+    return;
+  }
+
+  state.messages = state.messages.filter(m => m.role !== "thinking");
+
+  // Pull out <UPDATE>...</UPDATE> JSON blocks
+  let display = text;
+  const updateRe = /<UPDATE>([\s\S]*?)<\/UPDATE>/g;
+  let mm;
+  while ((mm = updateRe.exec(text)) !== null) {
+    try {
+      const obj = JSON.parse(mm[1].trim());
+      applyStep({
+        reqUpdates: obj.reqUpdates,
+        catalogTags: obj.catalogTags,
+        assembly: obj.assembly
+      });
+    } catch (err) {
+      console.warn("Could not parse UPDATE block", err, mm[1]);
+    }
+  }
+  display = display.replace(updateRe, "").trim();
+
+  state.messages.push({ role: "broker", text: display || "(no visible content)" });
+  renderAll();
+}
+
+function snapshotReq() {
+  const out = {};
+  for (const [k,v] of Object.entries(state.reqSpec)) out[k] = v.value;
+  return out;
+}
+
+// =====================================================================
+// MODE & SCENARIO SWITCHING
+// =====================================================================
+function setMode(mode) {
+  state.mode = mode;
+  $("mode-scripted").classList.toggle("active", mode === "scripted");
+  $("mode-live").classList.toggle("active",     mode === "live");
+  $("advance-btn").classList.toggle("hidden", mode !== "scripted");
+  $("user-input").classList.toggle("hidden",   mode !== "live");
+  $("send-btn").classList.toggle("hidden",     mode !== "live");
+  if (mode === "live") {
+    if (state.proxyUrl) {
+      $("user-input").placeholder = "Type as the consumer (via shared proxy)…";
+    } else if (state.apiKey) {
+      $("user-input").placeholder = "Type as the consumer (your API key)…";
+    } else {
+      $("user-input").placeholder = "Set proxy URL or API key in Settings first";
+    }
+  }
+  renderModeIndicator();
+}
+
+function setScenario(key) {
+  state.scenarioKey = key;
+  resetAll(/*keepMode*/true);
+  if (state.mode === "scripted") {
+    // Seed with the broker's opening so the consumer knows where they are
+    // Actually leave it blank and let the user click Next. But put a small system note:
+    state.messages.push({ role: "system", text: `Scenario: ${currentScenario().title}. Click "Next message" to walk the conversation.` });
+    renderMessages();
+  } else {
+    state.messages.push({ role: "system", text: `Scenario context loaded (${currentScenario().title}). In live mode, scenario only seeds the catalog tags — type freely.` });
+    renderMessages();
+  }
+}
+
+function resetAll(keepMode = false) {
+  state.stepIdx = 0;
+  state.messages = [];
+  state.reqSpec = emptyReqSpec();
+  state.catalogTags = {};
+  state.assembly = null;
+  if (!keepMode) setMode("scripted");
+  renderAll();
+}
+
+// =====================================================================
+// SETTINGS MODAL
+// =====================================================================
+function openSettings() {
+  $("proxy-url").value = state.proxyUrl;
+  $("api-key").value = state.apiKey;
+  $("api-model").value = state.model;
+  $("system-prompt").value = state.systemPrompt;
+  $("settings-modal").classList.remove("hidden");
+}
+function closeSettings() { $("settings-modal").classList.add("hidden"); }
+function saveSettings() {
+  state.proxyUrl = $("proxy-url").value.trim();
+  state.apiKey = $("api-key").value.trim();
+  state.model  = $("api-model").value.trim() || "claude-sonnet-4-6";
+  state.systemPrompt = $("system-prompt").value;
+  closeSettings();
+  // If currently in live mode, re-apply mode so the placeholder updates.
+  if (state.mode === "live") setMode("live");
+  renderModeIndicator();
+}
+
+// =====================================================================
+// WIRE UP
+// =====================================================================
+function init() {
+  // Populate scenario picker
+  const sel = $("scenario-picker");
+  for (const [k, sc] of Object.entries(SCENARIOS)) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = sc.title;
+    sel.appendChild(opt);
+  }
+  sel.value = state.scenarioKey;
+
+  $("mode-scripted").addEventListener("click", () => setMode("scripted"));
+  $("mode-live").addEventListener("click",     () => setMode("live"));
+  sel.addEventListener("change", e => setScenario(e.target.value));
+  $("reset-btn").addEventListener("click", () => resetAll(true));
+  $("settings-btn").addEventListener("click", openSettings);
+  $("settings-close").addEventListener("click", closeSettings);
+  $("settings-save").addEventListener("click", saveSettings);
+  $("advance-btn").addEventListener("click", advanceScripted);
+  $("send-btn").addEventListener("click", () => {
+    const v = $("user-input").value.trim();
+    if (!v) return;
+    $("user-input").value = "";
+    sendLive(v);
+  });
+  $("user-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") $("send-btn").click();
+  });
+
+  // Seed
+  state.messages.push({ role: "system", text: `Scenario: ${currentScenario().title}. Click "Next message" to walk the conversation.` });
+  renderAll();
+}
+
+init();
+</script>
+</body>
+</html>
