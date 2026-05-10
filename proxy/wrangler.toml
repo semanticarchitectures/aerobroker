@@ -2,15 +2,15 @@ name = "aerobroker-proxy"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
 
-# After running `wrangler kv:namespace create RATE_LIMITS`, paste the returned id here.
+# After running `wrangler kv namespace create RATE_LIMITS`, paste the returned id here.
 [[kv_namespaces]]
 binding = "RATE_LIMITS"
-id = "PASTE_KV_NAMESPACE_ID_HERE"
+id = "f27d82e7b00a4bb0b30a6c81c35a05c5"
 
 [vars]
 # Lock this down to your GitHub Pages origin to prevent strangers from using your key
 # from arbitrary sites. Comma-separated for multiple. Use "*" for any (NOT RECOMMENDED).
-ALLOWED_ORIGINS = "https://YOUR-USERNAME.github.io"
+ALLOWED_ORIGINS = "https://semanticarchitectures.github.io"
 
 # Per-user daily request cap (best-effort, by client IP).
 MAX_REQUESTS_PER_IP_PER_DAY = "20"
