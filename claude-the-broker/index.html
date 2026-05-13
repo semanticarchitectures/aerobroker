@@ -1,0 +1,1521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ClaudeTheBroker — residential real estate broker prototype</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { height: 100%; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b1220; color: #e6edf7; }
+  .pane { background: #111a2e; border: 1px solid #1f2a44; border-radius: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; line-height: 1.4; border: 1px solid #2a3858; background: #18223a; color: #c8d4ee; }
+  .chip-on  { background: #1d3a2a; border-color: #2f6f4a; color: #b8f1cc; }
+  .chip-warn{ background: #2a261d; border-color: #6f5e2f; color: #f1e2bc; }
+  .chip-priv{ background: #2a1d3a; border-color: #5e2f6f; color: #e1bcf1; }
+  .chip-buyer{ background: #1d2a3a; border-color: #2f4f6f; color: #bcd0f1; }
+  .chip-seller{ background: #3a2a1d; border-color: #6f4f2f; color: #f1d0bc; }
+  .row-line { border-top: 1px dashed #2a3858; }
+  .scroll { overflow-y: auto; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: #1f2a44; border-radius: 8px; }
+  .msg-broker { background:#142244; border:1px solid #1f3666; }
+  .msg-user   { background:#23304a; border:1px solid #324870; }
+  .msg-system { background:#2a1d1d; border:1px solid #6f2f2f; color:#f3c8c8; font-size: 12px; }
+  .msg-signal { background:#2a1d3a; border:1px solid #5e2f6f; color:#e1bcf1; font-size: 12px; }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background:#1c2742; border:1px solid #2a3858; padding:1px 5px; border-radius:4px; color:#bcd0f7; }
+  .pill-btn { padding: 4px 10px; border-radius: 999px; font-size: 12px; border: 1px solid #2a3858; background:#18223a; color:#c8d4ee; cursor: pointer; }
+  .pill-btn:hover { background:#1f2a44; }
+  .pill-btn.active { background:#1d3a2a; border-color:#2f6f4a; color:#b8f1cc; }
+  .modal { position: fixed; inset:0; background: rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal-card { background:#111a2e; border:1px solid #1f2a44; border-radius:12px; max-width: 640px; width: calc(100% - 32px); padding: 20px; }
+  textarea, input[type=text], input[type=password] { background:#0b1220; border:1px solid #2a3858; color:#e6edf7; border-radius:8px; padding:8px 10px; width:100%; font-size: 13px; }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .grid-3 { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.95fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-height: 0; }
+  @media (max-width: 1100px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+  .listing-card { background:#0e1729; border:1px solid #213152; border-radius:10px; padding:10px; cursor: pointer; transition: border-color .15s; }
+  .listing-card:hover { border-color: #2f6f4a; }
+  .listing-card.active { border-color: #2f6f4a; background:#11211a; }
+  .badge { display:inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; line-height:1.4; font-weight:600; letter-spacing: .02em; }
+  .badge-public { background:#1d2a3a; color:#bcd0f1; border:1px solid #2f4f6f; }
+  .badge-private { background:#2a1d3a; color:#e1bcf1; border:1px solid #5e2f6f; }
+  .badge-match  { background:#1d3a2a; color:#b8f1cc; border:1px solid #2f6f4a; }
+  .badge-warn   { background:#2a261d; color:#f1e2bc; border:1px solid #6f5e2f; }
+  .gauge { height: 8px; background:#0b1220; border:1px solid #2a3858; border-radius: 999px; overflow: hidden; position: relative; }
+  .gauge-fill { height: 100%; background: linear-gradient(90deg, #2f6f4a, #b8f1cc); transition: width .4s; }
+  .signal-row { padding: 6px 8px; background: #0e1729; border: 1px solid #213152; border-radius: 6px; font-size: 12px; }
+  .typing { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #8aa1d4; margin: 0 1px; animation: typing 1.2s infinite; }
+  .typing:nth-child(2) { animation-delay: .15s; }
+  .typing:nth-child(3) { animation-delay: .3s; }
+  @keyframes typing { 0%,80%,100%{ transform: translateY(0); opacity:.3 } 40%{ transform: translateY(-3px); opacity:1 } }
+  .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .view.active { display: flex; }
+  .col-buyer-frame  { background:#0c1626; border:1px solid #2a3858; border-radius:10px; padding:10px; }
+  .col-seller-frame { background:#1a1310; border:1px solid #4a3528; border-radius:10px; padding:10px; }
+  .col-broker-frame { background:#181024; border:1px solid #4a2e6a; border-radius:10px; padding:10px; }
+  .priv-line { background:#1a112a; border-left: 3px solid #5e2f6f; padding: 6px 8px; border-radius: 4px; font-size: 12px; margin-top: 4px; }
+  .pub-line  { background:#0e1729; border-left: 3px solid #2f4f6f; padding: 6px 8px; border-radius: 4px; font-size: 12px; margin-top: 4px; }
+  .deal-prop { background: linear-gradient(180deg, #11211a, #0d1a14); border: 1px solid #2f6f4a; border-radius: 10px; padding: 12px; }
+  .small { font-size: 11px; color: #8aa1d4; }
+  h2.section { font-weight: 600; font-size: 13px; color: #e6edf7; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="max-w-[1500px] mx-auto p-4 flex flex-col gap-3" style="min-height:100vh">
+
+  <!-- Header -->
+  <div class="pane p-3 flex flex-wrap items-center gap-3">
+    <div class="flex items-center gap-3">
+      <div class="text-2xl">🏡</div>
+      <div>
+        <div class="text-lg font-semibold">ClaudeTheBroker</div>
+        <div class="text-xs text-slate-400 -mt-0.5">Residential real estate · asymmetric information broker</div>
+      </div>
+    </div>
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-1 mr-2">
+      <span class="text-xs text-slate-400 mr-1">View:</span>
+      <button id="view-buyer"  class="pill-btn active">Buyer</button>
+      <button id="view-seller" class="pill-btn">Seller</button>
+      <button id="view-back"   class="pill-btn">Back-office</button>
+    </div>
+
+    <div class="flex items-center gap-1">
+      <span class="text-xs text-slate-400 mr-1">Mode:</span>
+      <button id="mode-scripted" class="pill-btn active">Scripted</button>
+      <button id="mode-live"     class="pill-btn">Live Claude</button>
+    </div>
+
+    <div class="flex items-center gap-1 ml-2">
+      <span class="text-xs text-slate-400 mr-1">Scenario:</span>
+      <select id="scenario-picker" class="pill-btn" style="padding:6px 10px"></select>
+    </div>
+
+    <button id="reset-btn"    class="pill-btn">Reset</button>
+    <button id="settings-btn" class="pill-btn">Settings</button>
+  </div>
+
+  <!-- BUYER VIEW -->
+  <div id="view-buyer-pane" class="view active">
+    <div class="grid-3 flex-1">
+      <!-- Conversation -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold">Buyer ↔ Broker</div>
+          <div id="mode-indicator-buyer" class="chip">scripted</div>
+        </div>
+        <div id="messages-buyer" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0"></div>
+        <div class="mt-2 flex gap-2">
+          <button id="advance-btn-buyer" class="pill-btn active" style="padding:8px 14px">Next message ▸</button>
+          <input id="user-input-buyer" type="text" placeholder="Live mode: type as the buyer…" class="hidden" />
+          <button id="send-btn-buyer"  class="pill-btn hidden" style="padding:8px 14px">Send</button>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1">
+          Click <span class="kbd">Next message</span> to walk the conversation. Watch the middle panel — public criteria, confidential preferences, and behavioral signals all evolve as the broker learns.
+        </div>
+      </div>
+
+      <!-- Buyer Profile -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <h2 class="section">Buyer profile <span class="text-xs text-slate-400 font-normal">— what the broker knows</span></h2>
+        <div id="buyer-profile" class="scroll flex-1 pr-1 text-sm" style="min-height:0"></div>
+      </div>
+
+      <!-- Listing feed -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <h2 class="section">Personalized listing feed <span class="text-xs text-slate-400 font-normal">— sorted by broker score</span></h2>
+        <div id="listing-feed" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SELLER VIEW -->
+  <div id="view-seller-pane" class="view">
+    <div class="grid-3 flex-1">
+      <!-- Conversation -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold">Seller ↔ Broker</div>
+          <div id="mode-indicator-seller" class="chip">scripted</div>
+        </div>
+        <div id="messages-seller" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0"></div>
+        <div class="mt-2 flex gap-2">
+          <button id="advance-btn-seller" class="pill-btn active" style="padding:8px 14px">Next message ▸</button>
+          <input id="user-input-seller" type="text" placeholder="Live mode: type as the seller…" class="hidden" />
+          <button id="send-btn-seller"  class="pill-btn hidden" style="padding:8px 14px">Send</button>
+        </div>
+      </div>
+
+      <!-- Listing profile (their listing) -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <h2 class="section">Their listing <span class="text-xs text-slate-400 font-normal">— public + confidential</span></h2>
+        <div id="seller-listing-profile" class="scroll flex-1 pr-1 text-sm" style="min-height:0"></div>
+      </div>
+
+      <!-- Anonymous match candidates -->
+      <div class="pane p-3 flex flex-col" style="min-height: 600px">
+        <h2 class="section">Anonymous buyer matches <span class="text-xs text-slate-400 font-normal">— broker-curated</span></h2>
+        <div id="seller-matches" class="scroll flex-1 flex flex-col gap-2 pr-1" style="min-height:0"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACK-OFFICE VIEW -->
+  <div id="view-back-pane" class="view">
+    <div class="grid-3 flex-1">
+      <!-- Buyer's view of the world -->
+      <div class="col-buyer-frame flex flex-col scroll" style="min-height: 600px">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="section" style="margin:0">What the buyer sees</h2>
+          <span class="chip chip-buyer">buyer view</span>
+        </div>
+        <div id="back-buyer-view" class="text-sm flex-1"></div>
+      </div>
+
+      <!-- Seller's view of the world -->
+      <div class="col-seller-frame flex flex-col scroll" style="min-height: 600px">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="section" style="margin:0">What the seller sees</h2>
+          <span class="chip chip-seller">seller view</span>
+        </div>
+        <div id="back-seller-view" class="text-sm flex-1"></div>
+      </div>
+
+      <!-- Broker's confidential ledger -->
+      <div class="col-broker-frame flex flex-col scroll" style="min-height: 600px">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="section" style="margin:0">What the broker knows</h2>
+          <span class="chip chip-priv">confidential</span>
+        </div>
+        <div id="back-broker-view" class="text-sm flex-1"></div>
+      </div>
+    </div>
+
+    <!-- Cross-side match proposal -->
+    <div class="mt-3 pane p-3">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="section" style="margin:0">Cross-side match proposal</h2>
+        <button id="advance-btn-back" class="pill-btn active" style="padding:6px 14px">Next step ▸</button>
+      </div>
+      <div id="match-proposal" class="text-sm">
+        <div class="text-slate-500 italic">Click <span class="kbd">Next step</span> to walk the back-office reasoning that produces a deal neither side would have found via MLS.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Design notes -->
+  <details class="pane p-3 text-sm">
+    <summary class="font-semibold">▸ Design notes (asymmetric-info broker model)</summary>
+    <div class="mt-3 grid md:grid-cols-2 gap-4 text-slate-300 leading-relaxed">
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">The wedge</div>
+        <p>Each party tells the broker things they wouldn't tell the other side. The broker is the only entity holding both ledgers — it can find matches and propose terms that neither MLS search nor either side's agent could.</p>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Why this is hard for a marketplace</div>
+        <p>Marketplaces work by exposing inventory and price. This model deliberately doesn't — it keeps the most decision-relevant info <i>private</i>. The conversation is the product; the broker's value is steward&shy;ship, not inventory.</p>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Behavioral signals</div>
+        <p>The intent-to-buy gauge moves with revealed and inferred behavior: dwell time on listings, repeat visits, asked questions, sent-to-spouse, home-tour requests. These never go to sellers but inform the broker's match scoring.</p>
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Open design questions</div>
+        <ul class="list-disc pl-5 space-y-1">
+          <li>How should the broker disclose <i>that</i> it knows something private without revealing what?</li>
+          <li>Fiduciary status — agent-of-buyer, agent-of-seller, or dual-agent? US laws vary by state and matter a lot here.</li>
+          <li>Compensation: % of savings vs. retainer vs. spread on price-discovery.</li>
+          <li>What's the audit trail when a deal closes — proving the broker handled confidences fairly?</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="flex items-center justify-between mb-3">
+      <div class="font-semibold">Settings</div>
+      <button id="settings-close" class="pill-btn">✕</button>
+    </div>
+    <div class="text-sm text-slate-300 space-y-3">
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Live Claude mode</div>
+        <p class="text-xs text-slate-400 mb-2">
+          Live mode routes through your shared proxy (preferred) or, if no proxy URL is set, calls Anthropic directly with your own key.
+        </p>
+        <label class="block text-xs text-slate-400 mb-1">Backend proxy URL <span class="text-slate-500">(preset to shared AeroBroker proxy)</span></label>
+        <input id="proxy-url" type="text" placeholder="https://aerobroker-proxy.kevin-g-kelly.workers.dev/v1/messages" autocomplete="off" />
+        <label class="block text-xs text-slate-400 mt-3 mb-1">Anthropic API key <span class="text-slate-500">(only used when no proxy URL is set)</span></label>
+        <input id="api-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
+        <label class="block text-xs text-slate-400 mt-3 mb-1">Model</label>
+        <input id="api-model" type="text" value="claude-sonnet-4-6" />
+      </div>
+      <div>
+        <div class="font-semibold text-slate-100 mb-1">Broker system prompt (editable)</div>
+        <p class="text-xs text-slate-400 mb-2">The active buyer/seller profile and listing context are appended automatically.</p>
+        <textarea id="system-prompt" rows="10"></textarea>
+      </div>
+      <div class="flex justify-end">
+        <button id="settings-save" class="pill-btn active" style="padding:6px 14px">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// PROXY  — preset to the shared AeroBroker worker (same Origin allowed)
+// =====================================================================
+const DEFAULT_PROXY_URL = "https://aerobroker-proxy.kevin-g-kelly.workers.dev/v1/messages";
+
+// =====================================================================
+// LISTING DATA
+// =====================================================================
+const LISTINGS = [
+  {
+    id: "L-2317-MAPLE",
+    address: "2317 Maple Ave",
+    neighborhood: "Hyde Park",
+    city: "Austin", state: "TX", zip: "78751",
+    type: "single-family",
+    beds: 3, baths: 2, sqft: 1820, lotSqft: 6500, yearBuilt: 1948,
+    listPrice: 625000, originalListPrice: 645000, daysOnMarket: 56,
+    hoaMonthly: 0, taxesAnnual: 11400,
+    schoolRating: 8, walkScore: 78,
+    publicFeatures: ["Updated kitchen (2022)","Original hardwoods","Detached garage","Mature pecans"],
+    publicDescription: "Charming Hyde Park bungalow on a leafy block — recent kitchen update, original details preserved. Walk to coffee, restaurants, and the trail.",
+    seller: {
+      name: "McKinney family",
+      motivation: "job_relocation",
+      motivationDetail: "Relocating to Phoenix for a hospital job, must be in PHX by Sept 1.",
+      urgency: 88,
+      trueFloor: 590000,
+      flexibility: ["Can flex on closing date 21–60 days","Open to small post-close occupancy","Will leave appliances for right offer"],
+      privateConcerns: ["Don't want neighbors to know about the move yet","Sensitive about lower price after $20k cut already"],
+      finishedBasement: true,
+      basementFinishedYear: 2019,
+      basementSqft: 700
+    }
+  },
+  {
+    id: "L-1108-FLINT",
+    address: "1108 Flint Rock Ln",
+    neighborhood: "Bouldin Creek",
+    city: "Austin", state: "TX", zip: "78704",
+    type: "single-family",
+    beds: 4, baths: 3, sqft: 2350, lotSqft: 5800, yearBuilt: 2008,
+    listPrice: 749000, daysOnMarket: 18,
+    hoaMonthly: 0, taxesAnnual: 13800,
+    schoolRating: 7, walkScore: 84,
+    publicFeatures: ["Open plan","Primary on main","Backyard pool","Solar panels"],
+    publicDescription: "Modern Bouldin home with primary suite on main, backyard pool, and Tesla-ready garage.",
+    seller: {
+      name: "Patel",
+      motivation: "upgrade",
+      motivationDetail: "Buying larger home in Westlake; only sells if their target home goes under contract.",
+      urgency: 35,
+      trueFloor: 720000,
+      flexibility: ["Contingent on their next purchase"],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-805-CRESTRIDGE",
+    address: "805 Crestridge Dr",
+    neighborhood: "Allandale",
+    city: "Austin", state: "TX", zip: "78757",
+    type: "single-family",
+    beds: 3, baths: 2, sqft: 1640, lotSqft: 8200, yearBuilt: 1962,
+    listPrice: 575000, daysOnMarket: 22,
+    hoaMonthly: 0, taxesAnnual: 10100,
+    schoolRating: 9, walkScore: 62,
+    publicFeatures: ["Cul-de-sac","Big yard","Workshop in garage","Recently re-roofed"],
+    publicDescription: "Mid-century ranch on a quiet cul-de-sac, big yard, top-rated schools.",
+    seller: {
+      name: "Ramirez estate",
+      motivation: "estate_sale",
+      motivationDetail: "Estate sale, three siblings inheriting; want it done.",
+      urgency: 75,
+      trueFloor: 540000,
+      flexibility: ["Estate as-is, no repairs","Will accept any standard close terms"],
+      privateConcerns: ["Foundation crack noted in inspection but not advertised; quote says $7k repair"]
+    }
+  },
+  {
+    id: "L-3412-COVE",
+    address: "3412 Cove Park Cir",
+    neighborhood: "Mueller",
+    city: "Austin", state: "TX", zip: "78723",
+    type: "townhome",
+    beds: 3, baths: 2.5, sqft: 1780, daysOnMarket: 7,
+    listPrice: 642000, hoaMonthly: 240, taxesAnnual: 11900, yearBuilt: 2018,
+    schoolRating: 8, walkScore: 89,
+    publicFeatures: ["Rooftop deck","2-car garage","HOA park access"],
+    publicDescription: "Mueller townhome with rooftop deck and easy walks to all the parks.",
+    seller: {
+      name: "Diaz",
+      motivation: "downsize",
+      motivationDetail: "Empty-nesters, no rush.",
+      urgency: 20,
+      trueFloor: 625000,
+      flexibility: [],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-512-WEST-30",
+    address: "512 W 30th St",
+    neighborhood: "West Campus",
+    city: "Austin", state: "TX", zip: "78705",
+    type: "condo",
+    beds: 2, baths: 2, sqft: 1140, daysOnMarket: 41,
+    listPrice: 419000, hoaMonthly: 380, taxesAnnual: 7600, yearBuilt: 2014,
+    schoolRating: 6, walkScore: 95,
+    publicFeatures: ["Walk to UT","Pool","Gated"],
+    publicDescription: "Walk-to-campus condo, in-unit laundry, gated complex.",
+    seller: {
+      name: "Investor LLC",
+      motivation: "portfolio_rebalance",
+      motivationDetail: "Investor LLC selling 4 units this quarter to rotate capital.",
+      urgency: 55,
+      trueFloor: 395000,
+      flexibility: ["Will close in 14 days for cash"],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-9 ROSE",
+    address: "9 Rose Hollow Way",
+    neighborhood: "Tarrytown",
+    city: "Austin", state: "TX", zip: "78703",
+    type: "single-family",
+    beds: 4, baths: 3.5, sqft: 3100, lotSqft: 9000, yearBuilt: 1996,
+    listPrice: 1450000, daysOnMarket: 12,
+    hoaMonthly: 0, taxesAnnual: 26000,
+    schoolRating: 10, walkScore: 51,
+    publicFeatures: ["Renovated 2021","Office + media room","Pool"],
+    publicDescription: "Tarrytown classic, renovated top to bottom in 2021.",
+    seller: {
+      name: "Holloway",
+      motivation: "upgrade",
+      motivationDetail: "Building larger home, target completion Q3 next year.",
+      urgency: 25,
+      trueFloor: 1395000,
+      flexibility: ["Long lease-back negotiable"],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-1740-PALM",
+    address: "1740 Palm Park Dr",
+    neighborhood: "Cherrywood",
+    city: "Austin", state: "TX", zip: "78722",
+    type: "single-family",
+    beds: 3, baths: 2, sqft: 1480, lotSqft: 6200, yearBuilt: 1955,
+    listPrice: 549000, daysOnMarket: 30,
+    hoaMonthly: 0, taxesAnnual: 9800,
+    schoolRating: 7, walkScore: 73,
+    publicFeatures: ["Bungalow charm","Walk to coffee","Detached studio"],
+    publicDescription: "Cherrywood bungalow with detached studio — perfect for WFH.",
+    seller: {
+      name: "Chen",
+      motivation: "moving_out_of_state",
+      motivationDetail: "Moving to Seattle for spouse's job, lease starts in October.",
+      urgency: 70,
+      trueFloor: 525000,
+      flexibility: ["30-day close ideal","Flexible on small repairs"],
+      privateConcerns: ["Some foundation movement, quoted $4k for piers"]
+    }
+  },
+  {
+    id: "L-2200-FOSTER",
+    address: "2200 Foster Ln",
+    neighborhood: "Crestview",
+    city: "Austin", state: "TX", zip: "78757",
+    type: "single-family",
+    beds: 3, baths: 2, sqft: 1720, lotSqft: 7100, yearBuilt: 1958,
+    listPrice: 615000, daysOnMarket: 4,
+    hoaMonthly: 0, taxesAnnual: 11000,
+    schoolRating: 9, walkScore: 70,
+    publicFeatures: ["Recently renovated","Quiet street","Detached garage"],
+    publicDescription: "Move-in-ready Crestview ranch on a quiet street — fresh paint, new floors.",
+    seller: {
+      name: "Nguyen",
+      motivation: "test_market",
+      motivationDetail: "Just listed, holding firm.",
+      urgency: 15,
+      trueFloor: 600000,
+      flexibility: [],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-77-SHADY",
+    address: "77 Shady Hollow Ct",
+    neighborhood: "South Lamar",
+    city: "Austin", state: "TX", zip: "78704",
+    type: "single-family",
+    beds: 3, baths: 2.5, sqft: 1980, daysOnMarket: 60, lotSqft: 5400, yearBuilt: 2010,
+    listPrice: 695000, originalListPrice: 729000, hoaMonthly: 0, taxesAnnual: 12300,
+    schoolRating: 7, walkScore: 81,
+    publicFeatures: ["Modern build","Two-car garage","Office nook"],
+    publicDescription: "South Lamar modern with office, two-car garage, and a tucked-away ct.",
+    seller: {
+      name: "Singh",
+      motivation: "divorce",
+      motivationDetail: "Divorce; both parties want clean exit.",
+      urgency: 90,
+      trueFloor: 645000,
+      flexibility: ["Either spouse can sign","Open to short close"],
+      privateConcerns: ["Don't disclose reason for sale; both anxious about it leaking"]
+    }
+  },
+  {
+    id: "L-901-BARTON",
+    address: "901 Barton Hills Dr #14",
+    neighborhood: "Barton Hills",
+    city: "Austin", state: "TX", zip: "78704",
+    type: "condo",
+    beds: 2, baths: 2, sqft: 1320, daysOnMarket: 25,
+    listPrice: 489000, hoaMonthly: 410, taxesAnnual: 8400, yearBuilt: 1982,
+    schoolRating: 8, walkScore: 78,
+    publicFeatures: ["Greenbelt access","Pool","Quiet building"],
+    publicDescription: "Barton Hills condo with greenbelt steps from your door.",
+    seller: {
+      name: "Anderson",
+      motivation: "sell_to_buy_elsewhere",
+      motivationDetail: "Selling to fund a primary purchase elsewhere.",
+      urgency: 45,
+      trueFloor: 470000,
+      flexibility: [],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-433-KOENIG",
+    address: "433 Koenig Park Ave",
+    neighborhood: "Brentwood",
+    city: "Austin", state: "TX", zip: "78751",
+    type: "single-family",
+    beds: 3, baths: 2, sqft: 1610, lotSqft: 7300, yearBuilt: 1953,
+    listPrice: 599000, daysOnMarket: 38,
+    hoaMonthly: 0, taxesAnnual: 10500,
+    schoolRating: 8, walkScore: 75,
+    publicFeatures: ["Hyde Park-adjacent","Updated bath","Big trees"],
+    publicDescription: "Brentwood charmer near Hyde Park.",
+    seller: {
+      name: "Williams",
+      motivation: "upgrade",
+      motivationDetail: "Upsizing, no urgency.",
+      urgency: 25,
+      trueFloor: 580000,
+      flexibility: [],
+      privateConcerns: []
+    }
+  },
+  {
+    id: "L-1155-EAST-7",
+    address: "1155 E 7th St",
+    neighborhood: "East Austin",
+    city: "Austin", state: "TX", zip: "78702",
+    type: "single-family",
+    beds: 4, baths: 3, sqft: 2240, lotSqft: 5500, yearBuilt: 2019,
+    listPrice: 875000, daysOnMarket: 10,
+    hoaMonthly: 0, taxesAnnual: 16000,
+    schoolRating: 6, walkScore: 88,
+    publicFeatures: ["New construction","Roof deck","Two-car garage"],
+    publicDescription: "Modern East Austin build with roof deck and city skyline view.",
+    seller: {
+      name: "Builder LLC",
+      motivation: "spec_inventory",
+      motivationDetail: "Builder spec home — second one of three on the block.",
+      urgency: 50,
+      trueFloor: 840000,
+      flexibility: ["Can include some upgrades to close"],
+      privateConcerns: []
+    }
+  }
+];
+
+// =====================================================================
+// BUYER PROFILE TEMPLATES
+// =====================================================================
+function emptyBuyerProfile() {
+  return {
+    name: null, household: null,
+    public: {
+      areas: [], priceMax: null, priceMin: null,
+      beds: null, baths: null, type: null,
+      timeframe: null
+    },
+    confidential: {
+      trueCeiling: null,
+      timelineMotivation: null,
+      realMustHaves: [],
+      softWants: [],
+      hardDealbreakers: [],
+      hiddenAreaPreference: null,
+      hiddenLifestyleNotes: []
+    },
+    intentToBuyScore: 5,                  // 0-100
+    intentTrend: [5],
+    behavioralSignals: [],                // {ts, signal, weight}
+    feedback: []                          // {listingId, rating, notes}
+  };
+}
+
+function emptySellerProfile() {
+  return {
+    listingId: null,
+    public: {},
+    confidential: {
+      motivation: null,
+      urgency: null,
+      trueFloor: null,
+      flexibility: [],
+      privateConcerns: []
+    }
+  };
+}
+
+// =====================================================================
+// SCRIPTED SCENARIOS
+// =====================================================================
+// Each step: { broker?, user?, view?, profileUpdates?, intentDelta?, signals?, feedback?, listingHighlights?, sellerProfile?, backStep?, matchProposal? }
+
+const SCENARIOS = {
+  buyer_sarah: {
+    title: "Buyer · Sarah's Austin search (asymmetric-info build-up)",
+    view: "buyer",
+    consumer: "Sarah & Tom",
+    steps: [
+      {
+        broker: "Hi — I'm ClaudeTheBroker. Tell me about what you're looking for. We can take this slow; I'm here to learn what you actually want, not just check boxes.",
+        user: "We're thinking about moving in Austin. Maybe in the next 6 months. Looking around $500–580k. We have a 2-year-old.",
+        profileUpdates: {
+          name: "Sarah & Tom",
+          household: "family-young",
+          "public.areas": ["Austin (open)"],
+          "public.priceMin": 500000,
+          "public.priceMax": 580000,
+          "public.timeframe": "next 6 months",
+          "public.beds": 3
+        },
+        signals: [{ signal: "Stated max $580k. First conversation, broker noting public-vs-true gap likely.", weight: "neutral" }],
+        intentDelta: 5
+      },
+      {
+        broker: "Helpful start. A couple of questions that change my recommendations a lot: do you have a hard date you need to be moved by? And — be honest with me, this is just between us — is the $580k a real ceiling or your starting position?",
+        user: "Our lease ends Sept 15, so we'd like to be in by then. And… honestly, if it were the perfect house we'd stretch. We could probably do up to $610k for the right one. Don't share that with sellers though.",
+        profileUpdates: {
+          "confidential.trueCeiling": 610000,
+          "confidential.timelineMotivation": "Lease ends Sept 15 — moving twice with a toddler isn't an option."
+        },
+        signals: [
+          { signal: "Confidential ceiling $610k disclosed (vs. public $580k).", weight: "high" },
+          { signal: "Hard timeline: Sept 15 lease end. Reduces buyer leverage in negotiation.", weight: "high" }
+        ],
+        intentDelta: 12
+      },
+      {
+        broker: "Got it. I'll keep that to myself. What about neighborhoods — are you flexible, or are there 1-2 you're really targeting? And same question on schools.",
+        user: "Honestly, my parents are in Hyde Park and we'd love to be near them — like a 5 min drive. We're not putting that in any search though, we don't want sellers to know we're emotionally attached to the area.",
+        profileUpdates: {
+          "public.areas": ["Hyde Park","Brentwood","Allandale (open)"],
+          "confidential.hiddenAreaPreference": "Hyde Park (parents within 5 min drive — emotionally attached, will pay premium)",
+          "confidential.realMustHaves": ["≥3 bed", "Yard for toddler"],
+          "confidential.softWants": ["Walk to coffee", "Nearby park"]
+        },
+        signals: [
+          { signal: "Hidden geo-attachment to Hyde Park — willingness to pay premium without revealing it to seller.", weight: "high" },
+          { signal: "Areas list expanded to include Hyde Park-adjacent.", weight: "neutral" }
+        ],
+        intentDelta: 10,
+        listingHighlights: ["L-2317-MAPLE","L-433-KOENIG","L-805-CRESTRIDGE","L-1740-PALM","L-2200-FOSTER","L-77-SHADY"]
+      },
+      {
+        broker: "Perfect. I'm going to populate a feed — initial cut. The Hyde Park bungalow at 2317 Maple is technically above your stated max but I'm including it because of your real ceiling. Take your time, tell me which ones you actually like, even just gut reactions.",
+        user: "Wait — 2317 Maple is gorgeous. Let me look at it more.",
+        signals: [
+          { signal: "First listing-specific reaction. Returned to 2317 Maple unprompted. 1 click.", weight: "low" }
+        ],
+        intentDelta: 6,
+        listingHighlights: ["L-2317-MAPLE"]
+      },
+      {
+        broker: "Take your time. If you want, send the listing to Tom and we can pick up tomorrow.",
+        user: "Sent to Tom. He likes it too. Came back to look at the photos again. Does it have a finished basement? The listing isn't clear.",
+        feedback: [{ listingId: "L-2317-MAPLE", rating: "love", notes: "Sent to Tom; both interested. Asking about basement." }],
+        signals: [
+          { signal: "Sent listing to spouse — high social-investment signal.", weight: "high" },
+          { signal: "Returned 3rd time to 2317 Maple. Asked specific question about basement (suggests planned use).", weight: "high" }
+        ],
+        intentDelta: 18
+      },
+      {
+        broker: "Yes — there's a finished basement, ~700 sqft, finished in 2019. The listing under-emphasizes it because the seller's agent positioned the kitchen update as the headline. Why does the basement matter to you?",
+        user: "We were planning a second kid in 18 months and we'd want it as a play space, then eventually his room. That basement might be the thing.",
+        profileUpdates: {
+          "confidential.realMustHaves": ["≥3 bed", "Yard for toddler", "Bonus space for future 2nd kid"],
+          "confidential.hiddenLifestyleNotes": ["Planning second child within 18 months — drives need for future bedroom or convertible space"]
+        },
+        signals: [
+          { signal: "Future-state planning revealed (2nd child / conversion). High commitment signal.", weight: "high" },
+          { signal: "Specific feature (basement) reframed from amenity → potential decision driver.", weight: "high" }
+        ],
+        intentDelta: 16
+      },
+      {
+        broker: "Now I have enough to read the room. I want to flag something I know that the buyer-facing listing doesn't say: I have separate signals about 2317 Maple's seller side. I won't reveal what they are — but I think there's a deal here that the public listing doesn't suggest. Want me to walk through what I'd propose, in our back-office view?",
+        user: "Yes please.",
+        signals: [{ signal: "Buyer accepted broker's invitation to leverage cross-side info — informed-consent moment.", weight: "high" }],
+        intentDelta: 6
+      },
+      {
+        broker: "Switch to the Back-office view (top of the page) and we'll walk it. Otherwise, end of buyer-side scenario."
+      }
+    ]
+  },
+
+  back_match: {
+    title: "Back-office · cross-side match on 2317 Maple",
+    view: "back",
+    consumer: "ClaudeTheBroker",
+    requires: { activeListingId: "L-2317-MAPLE" },
+    steps: [
+      {
+        broker: "STAGE 1 — what each side sees on its own.",
+        backStep: "show_initial",
+        listingHighlights: ["L-2317-MAPLE"]
+      },
+      {
+        broker: "STAGE 2 — the broker's confidential ledger.",
+        backStep: "show_ledger"
+      },
+      {
+        broker: "STAGE 3 — overlap analysis. Public ceiling $580k vs. public list $625k → no overlap. Confidential ceiling $610k vs. confidential floor $590k → there IS a deal, in a $20k window. Plus matching timelines: buyer must close by Sept 15, seller must be in PHX by Sept 1.",
+        backStep: "show_overlap"
+      },
+      {
+        broker: "STAGE 4 — proposed terms: $595k, 21-day close (closes ~Sept 5), seller leaves appliances and includes a 2-week post-close occupancy if needed. The price gives the seller their needed floor + a small dignity premium; the close date solves the seller's must-be-in-PHX deadline AND lands inside the buyer's must-be-in-by-Sept-15.",
+        backStep: "show_proposal",
+        matchProposal: {
+          price: 595000,
+          closeWindow: "21 days (~Sept 5)",
+          terms: [
+            "Appliances stay (seller previously offered)",
+            "Up to 14-day post-close occupancy at $0/day, escrowed deposit",
+            "Buyer waives seller-paid pest inspection, accepts as-is on cosmetic items",
+            "Earnest money $15k, 5-day option period"
+          ],
+          forBuyer: "I'm not telling you the seller's exact floor, but I have signals that $595k will be accepted. Your true ceiling stays private — they'll think this is your stretch, not your start.",
+          forSeller: "I'm not telling you the buyer's exact ceiling. The terms include the post-close occupancy you mentioned wanting; I'm presenting it as a buyer concession.",
+          why: "Both sides reach their primary goal (timing for seller, getting the home for buyer). The $595k price sits above the seller's confidential floor and below the buyer's confidential ceiling. Neither side learns the other's hidden number; the broker's reputation for confidentiality is preserved."
+        }
+      },
+      {
+        broker: "STAGE 5 — what each side actually sees in their inbox after the broker proposes.",
+        backStep: "show_disclosed"
+      },
+      {
+        broker: "End of back-office walk. The point of this view is to make the broker's information stewardship VISIBLE — both as a design tool and, eventually, as an audit trail."
+      }
+    ]
+  },
+
+  seller_mckinney: {
+    title: "Seller · McKinney 2317 Maple intake (sketched)",
+    view: "seller",
+    consumer: "McKinney family",
+    requires: { activeListingId: "L-2317-MAPLE" },
+    steps: [
+      {
+        broker: "Welcome — let's talk about 2317 Maple. What's the situation that's bringing you to sell?",
+        user: "We're moving to Phoenix. I got a hospital job, start date is Sept 1.",
+        sellerProfile: {
+          "confidential.motivation": "job_relocation",
+          "confidential.privateConcerns": ["Don't want neighbors to know yet"]
+        }
+      },
+      {
+        broker: "How firm is Sept 1?",
+        user: "It's firm. We need to be in Phoenix by then, ideally with the kids enrolled in school.",
+        sellerProfile: {
+          "confidential.urgency": 88
+        }
+      },
+      {
+        broker: "OK. The list price is $625k after a $20k cut already. I want you to tell me the number that — privately, between us — you would accept for a fast clean close. Not your ideal. The number that gets you out.",
+        user: "If I knew the deal would close in three weeks and we didn't have to deal with anything, I'd take $590k.",
+        sellerProfile: {
+          "confidential.trueFloor": 590000,
+          "confidential.flexibility": ["Can flex closing 21–60 days","Open to short post-close occupancy","Will leave appliances"]
+        }
+      },
+      {
+        broker: "Got it. That's safe with me. I won't share the $590k with any buyer or any agent, ever. I might use it to find buyers I think can clear it — and I'll bring you their offers without telling them how close they were to your floor. Anything you don't want me to disclose about the property itself?"
+      },
+      {
+        broker: "End of seller intake. Switch to the Back-office view to see how this private floor combines with a buyer's private ceiling."
+      }
+    ]
+  }
+};
+
+// =====================================================================
+// STATE
+// =====================================================================
+let state = {
+  view: "buyer",
+  mode: "scripted",
+  scenarioKey: "buyer_sarah",
+  stepIdx: 0,
+  messages: { buyer: [], seller: [], back: [] },     // per view
+  buyerProfile: emptyBuyerProfile(),
+  sellerProfile: emptySellerProfile(),
+  activeListingId: null,
+  listingHighlights: [],     // ordered list of listing IDs the broker is surfacing
+  feedback: {},              // listingId → {rating, notes}
+  matchProposal: null,
+  backStage: null,           // which stage in the back-office walk
+  apiKey: "",
+  proxyUrl: DEFAULT_PROXY_URL,
+  model: "claude-sonnet-4-6",
+  systemPrompt: defaultSystemPrompt()
+};
+
+function defaultSystemPrompt() {
+  return `You are ClaudeTheBroker, a residential real estate broker that serves both buyers and sellers in Austin, TX.
+
+Your defining feature: you are an asymmetric-information broker. Each party reveals to you confidentially. You hold separate ledgers for each side — public preferences they're willing to share, plus confidential preferences they want to keep from the other side. You use cross-sided knowledge to find matches and propose terms that neither party would have found alone, while never leaking confidences from one side to the other.
+
+Behaviors:
+1. Elicit gradually. Ask one focused question at a time. Distinguish what's public vs. confidential explicitly.
+2. Track behavioral signals (return visits, dwell time, asking specific questions, sending to spouse, requesting tours). Update an intent-to-buy score over the conversation.
+3. When asymmetric info reveals a possible match, name the asymmetry to the buyer (and seller) without disclosing the other side's private info.
+4. Always remind the user what's confidential and what's not.
+
+After each reply, emit a JSON block on its own lines, between <UPDATE> and </UPDATE> tags, with structured updates:
+<UPDATE>
+{
+  "profileUpdates": { "public.priceMax": 580000, "confidential.trueCeiling": 610000, ... },
+  "intentDelta": 12,
+  "signals": [{ "signal": "...", "weight": "low|neutral|high" }],
+  "feedback": [{ "listingId": "L-...", "rating": "love|maybe|pass", "notes": "..." }],
+  "listingHighlights": ["L-...", ...]
+}
+</UPDATE>
+
+Available listing IDs (you'll see full data in context): L-2317-MAPLE, L-1108-FLINT, L-805-CRESTRIDGE, L-3412-COVE, L-512-WEST-30, L-9 ROSE, L-1740-PALM, L-2200-FOSTER, L-77-SHADY, L-901-BARTON, L-433-KOENIG, L-1155-EAST-7.`;
+}
+
+// =====================================================================
+// HELPERS
+// =====================================================================
+const $ = id => document.getElementById(id);
+const fmtMoney = n => n == null ? "—" : "$" + Number(n).toLocaleString();
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function setNested(obj, path, val) {
+  const parts = path.split(".");
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (cur[parts[i]] == null) cur[parts[i]] = {};
+    cur = cur[parts[i]];
+  }
+  cur[parts[parts.length - 1]] = val;
+}
+function listingById(id) { return LISTINGS.find(l => l.id === id); }
+function currentScenario() { return SCENARIOS[state.scenarioKey]; }
+
+// =====================================================================
+// MATCH SCORING (deterministic, simple)
+// =====================================================================
+function matchScore(listing, profile) {
+  const pub = profile.public;
+  let score = 50;
+  // Price (uses confidential ceiling if known)
+  const ceiling = profile.confidential.trueCeiling || pub.priceMax;
+  if (ceiling) {
+    if (listing.listPrice <= (pub.priceMax || ceiling)) score += 20;
+    else if (listing.listPrice <= ceiling + 10000) score += 12; // stretchable
+    else score -= 30;
+  }
+  // Beds
+  if (pub.beds && listing.beds >= pub.beds) score += 10;
+  // Hidden area preference (broker advantage)
+  if (profile.confidential.hiddenAreaPreference && listing.neighborhood) {
+    if (profile.confidential.hiddenAreaPreference.toLowerCase().includes(listing.neighborhood.toLowerCase())) score += 25;
+  }
+  // School + walk for families
+  if (profile.household === "family-young" || profile.household === "family-school-age") {
+    score += Math.min(10, listing.schoolRating || 0);
+    score += Math.min(5, (listing.walkScore || 0) / 20);
+  }
+  // Confidential must-have: bonus space
+  if ((profile.confidential.realMustHaves || []).some(x => /bonus|future|2nd kid|basement/i.test(x))) {
+    if (listing.seller && listing.seller.finishedBasement) score += 12;
+  }
+  // Cross-side: motivated seller bonus when buyer is timeline-pressured
+  if (profile.confidential.timelineMotivation && listing.seller && listing.seller.urgency >= 70) {
+    score += 8;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function whyShow(listing, profile) {
+  const reasons = [];
+  if (listing.neighborhood && profile.confidential.hiddenAreaPreference &&
+      profile.confidential.hiddenAreaPreference.toLowerCase().includes(listing.neighborhood.toLowerCase())) {
+    reasons.push(`In ${listing.neighborhood} — your private area target`);
+  }
+  if (profile.confidential.trueCeiling && listing.listPrice > (profile.public.priceMax || 0)
+      && listing.listPrice <= profile.confidential.trueCeiling + 20000) {
+    reasons.push(`Above your stated max but inside your real ceiling`);
+  }
+  if (listing.seller && listing.seller.urgency >= 70) {
+    reasons.push(`Motivated seller (broker signal)`);
+  }
+  if (listing.seller && listing.seller.finishedBasement && (profile.confidential.realMustHaves || []).some(x => /bonus|2nd kid|basement|future/i.test(x))) {
+    reasons.push(`Has a finished basement — fits your hidden bonus-space need`);
+  }
+  if (reasons.length === 0) reasons.push(`Matches your stated criteria`);
+  return reasons.join(" · ");
+}
+
+// =====================================================================
+// RENDER — MESSAGES
+// =====================================================================
+function renderMessages(view) {
+  const el = $("messages-" + view);
+  if (!el) return;
+  el.innerHTML = "";
+  const msgs = state.messages[view] || [];
+  for (const m of msgs) {
+    const div = document.createElement("div");
+    if (m.role === "broker") {
+      div.className = "msg-broker rounded-lg p-3 text-sm";
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">ClaudeTheBroker</div><div class="whitespace-pre-wrap">${escapeHtml(m.text)}</div>`;
+    } else if (m.role === "user") {
+      div.className = "msg-user rounded-lg p-3 text-sm self-end max-w-[92%]";
+      const label = (currentScenario()?.consumer) || (view === "buyer" ? "Buyer" : view === "seller" ? "Seller" : "—");
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">${escapeHtml(label)}</div><div class="whitespace-pre-wrap">${escapeHtml(m.text)}</div>`;
+    } else if (m.role === "thinking") {
+      div.className = "msg-broker rounded-lg p-3 text-sm";
+      div.innerHTML = `<div class="text-xs text-slate-400 mb-1">ClaudeTheBroker</div><div><span class="typing"></span><span class="typing"></span><span class="typing"></span></div>`;
+    } else if (m.role === "signal") {
+      div.className = "msg-signal rounded-lg p-2";
+      div.innerHTML = `<b>signal</b> · ${escapeHtml(m.text)}`;
+    } else {
+      div.className = "msg-system rounded-lg p-2";
+      div.textContent = m.text;
+    }
+    el.appendChild(div);
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+// =====================================================================
+// RENDER — BUYER PROFILE
+// =====================================================================
+function renderBuyerProfile() {
+  const el = $("buyer-profile");
+  if (!el) return;
+  const p = state.buyerProfile;
+  const pub = p.public;
+  const conf = p.confidential;
+  const intentPct = Math.max(0, Math.min(100, p.intentToBuyScore));
+  const signals = (p.behavioralSignals || []).slice().reverse();
+
+  el.innerHTML = `
+    <div class="mb-3">
+      <div class="text-[11px] uppercase tracking-wide text-slate-400">Identity</div>
+      <div>${escapeHtml(p.name || "—")} <span class="text-slate-400">· ${escapeHtml(p.household || "household ?")}</span></div>
+    </div>
+
+    <div class="mb-3">
+      <div class="flex items-center justify-between">
+        <div class="text-[11px] uppercase tracking-wide text-slate-400">Intent-to-buy score</div>
+        <div class="text-sm font-semibold">${intentPct}/100</div>
+      </div>
+      <div class="gauge mt-1"><div class="gauge-fill" style="width:${intentPct}%"></div></div>
+    </div>
+
+    <div class="mb-3">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="badge badge-public">PUBLIC</span>
+        <span class="text-[11px] uppercase tracking-wide text-slate-400">Stated criteria</span>
+      </div>
+      <div class="pub-line">Areas: ${escapeHtml((pub.areas||[]).join(", ") || "—")}</div>
+      <div class="pub-line">Price range: ${fmtMoney(pub.priceMin)} – ${fmtMoney(pub.priceMax)}</div>
+      <div class="pub-line">Beds/baths: ${pub.beds ?? "?"} bd / ${pub.baths ?? "?"} ba · Type: ${escapeHtml(pub.type || "?")}</div>
+      <div class="pub-line">Timeframe: ${escapeHtml(pub.timeframe || "—")}</div>
+    </div>
+
+    <div class="mb-3">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="badge badge-private">CONFIDENTIAL</span>
+        <span class="text-[11px] uppercase tracking-wide text-slate-400">Held by broker only</span>
+      </div>
+      <div class="priv-line">True ceiling: ${fmtMoney(conf.trueCeiling)}</div>
+      <div class="priv-line">Timeline pressure: ${escapeHtml(conf.timelineMotivation || "—")}</div>
+      <div class="priv-line">Hidden area pref: ${escapeHtml(conf.hiddenAreaPreference || "—")}</div>
+      <div class="priv-line">Real must-haves: ${escapeHtml((conf.realMustHaves||[]).join(" · ") || "—")}</div>
+      <div class="priv-line">Soft wants: ${escapeHtml((conf.softWants||[]).join(" · ") || "—")}</div>
+      <div class="priv-line">Lifestyle / future: ${escapeHtml((conf.hiddenLifestyleNotes||[]).join(" · ") || "—")}</div>
+    </div>
+
+    <div class="mb-2">
+      <div class="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Behavioral signals (latest first)</div>
+      ${ signals.length === 0 ? '<div class="text-slate-500 italic text-xs">none yet</div>'
+        : signals.slice(0, 8).map(s => `<div class="signal-row mt-1"><span class="badge ${s.weight==='high'?'badge-warn':'badge-public'}">${escapeHtml(s.weight||'')}</span> ${escapeHtml(s.signal)}</div>`).join("") }
+    </div>
+  `;
+}
+
+// =====================================================================
+// RENDER — LISTING FEED
+// =====================================================================
+function renderListingFeed() {
+  const el = $("listing-feed");
+  if (!el) return;
+  const profile = state.buyerProfile;
+  // Order: highlights first, then everything else by match score
+  const highlightSet = new Set(state.listingHighlights || []);
+  const ordered = LISTINGS.slice().sort((a, b) => {
+    const aH = highlightSet.has(a.id) ? 1 : 0;
+    const bH = highlightSet.has(b.id) ? 1 : 0;
+    if (aH !== bH) return bH - aH;
+    return matchScore(b, profile) - matchScore(a, profile);
+  });
+
+  el.innerHTML = "";
+  // Show only highlights+top 6 if profile has any data
+  const visible = highlightSet.size > 0
+    ? ordered.filter(l => highlightSet.has(l.id) || matchScore(l, profile) >= 55).slice(0, 8)
+    : ordered.slice(0, 6);
+
+  for (const listing of visible) {
+    const score = matchScore(listing, profile);
+    const why = whyShow(listing, profile);
+    const isHighlighted = highlightSet.has(listing.id);
+    const fb = state.feedback[listing.id];
+    const card = document.createElement("div");
+    card.className = "listing-card" + (state.activeListingId === listing.id ? " active" : "");
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <div class="font-semibold text-sm">${escapeHtml(listing.address)}</div>
+          <div class="text-xs text-slate-400">${escapeHtml(listing.neighborhood)} · ${listing.beds}bd/${listing.baths}ba · ${(listing.sqft||0).toLocaleString()} sqft · ${listing.daysOnMarket}d on market</div>
+        </div>
+        <div class="text-right">
+          <div class="text-sm font-semibold">${fmtMoney(listing.listPrice)}</div>
+          <div class="text-[11px] text-emerald-300">match ${score}</div>
+        </div>
+      </div>
+      <div class="text-[12px] text-slate-300 mt-1">${escapeHtml(listing.publicDescription)}</div>
+      <div class="text-[11px] text-emerald-200 mt-1"><b>Why I'm showing you this:</b> ${escapeHtml(why)}</div>
+      ${ isHighlighted ? '<div class="text-[10px] mt-1"><span class="badge badge-match">surfaced by broker</span></div>' : '' }
+      ${ fb ? `<div class="text-[11px] mt-1"><span class="badge ${fb.rating==='love'?'badge-match':fb.rating==='pass'?'badge-warn':'badge-public'}">${escapeHtml(fb.rating)}</span> ${escapeHtml(fb.notes||'')}</div>` : "" }
+    `;
+    el.appendChild(card);
+  }
+}
+
+// =====================================================================
+// RENDER — SELLER VIEW
+// =====================================================================
+function renderSellerView() {
+  const el = $("seller-listing-profile");
+  if (!el) return;
+  const lid = state.activeListingId || (currentScenario()?.requires?.activeListingId);
+  const listing = lid ? listingById(lid) : null;
+
+  if (!listing) {
+    el.innerHTML = `<div class="text-slate-500 italic">No active listing for this scenario.</div>`;
+    $("seller-matches").innerHTML = "";
+    return;
+  }
+
+  const sellerConf = state.sellerProfile.confidential || {};
+
+  el.innerHTML = `
+    <div class="mb-3">
+      <div class="font-semibold">${escapeHtml(listing.address)}</div>
+      <div class="text-xs text-slate-400">${escapeHtml(listing.neighborhood)} · ${listing.beds}bd/${listing.baths}ba · ${(listing.sqft||0).toLocaleString()} sqft</div>
+    </div>
+
+    <div class="mb-3">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="badge badge-public">PUBLIC LISTING</span>
+      </div>
+      <div class="pub-line">List price: ${fmtMoney(listing.listPrice)}${listing.originalListPrice ? ` (orig. ${fmtMoney(listing.originalListPrice)})` : ""}</div>
+      <div class="pub-line">DOM: ${listing.daysOnMarket}</div>
+      <div class="pub-line">Features: ${escapeHtml((listing.publicFeatures||[]).join(" · "))}</div>
+    </div>
+
+    <div class="mb-3">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="badge badge-private">SELLER CONFIDENTIAL</span>
+        <span class="text-[11px] uppercase tracking-wide text-slate-400">Held by broker only</span>
+      </div>
+      <div class="priv-line">Motivation: ${escapeHtml(sellerConf.motivation || listing.seller?.motivation || "—")}</div>
+      <div class="priv-line">Urgency: ${(sellerConf.urgency ?? listing.seller?.urgency) ?? "—"}/100</div>
+      <div class="priv-line">True floor: ${fmtMoney(sellerConf.trueFloor || listing.seller?.trueFloor)}</div>
+      <div class="priv-line">Flexibility: ${escapeHtml(((sellerConf.flexibility && sellerConf.flexibility.length ? sellerConf.flexibility : listing.seller?.flexibility) || []).join(" · ") || "—")}</div>
+      <div class="priv-line">Concerns: ${escapeHtml(((sellerConf.privateConcerns && sellerConf.privateConcerns.length ? sellerConf.privateConcerns : listing.seller?.privateConcerns) || []).join(" · ") || "—")}</div>
+    </div>
+  `;
+
+  // Anonymous match candidates: any buyers/scenarios with confidential ceiling that fits
+  const matches = [];
+  if (state.buyerProfile.confidential.trueCeiling) {
+    const ceiling = state.buyerProfile.confidential.trueCeiling;
+    const floor = listing.seller?.trueFloor;
+    if (floor && ceiling >= floor) {
+      matches.push({
+        anon: "Buyer A",
+        windowLo: floor, windowHi: ceiling,
+        confidence: 85,
+        why: "Public price out of buyer's stated range, but real ceiling overlaps your floor. Buyer has timeline pressure aligned with your relocation deadline.",
+      });
+    }
+  }
+  $("seller-matches").innerHTML = matches.length === 0
+    ? `<div class="text-slate-500 italic text-sm">No active matches yet — broker is still building both ledgers.</div>`
+    : matches.map(m => `
+      <div class="listing-card">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold text-sm">${escapeHtml(m.anon)}</div>
+          <span class="badge badge-match">${m.confidence}% confidence</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1">Overlap window: ${fmtMoney(m.windowLo)} – ${fmtMoney(m.windowHi)} <span class="small">(broker holds exact figures)</span></div>
+        <div class="text-[12px] text-slate-300 mt-1">${escapeHtml(m.why)}</div>
+      </div>
+    `).join("");
+}
+
+// =====================================================================
+// RENDER — BACK-OFFICE VIEW
+// =====================================================================
+function renderBackOffice() {
+  const buyerEl  = $("back-buyer-view");
+  const sellerEl = $("back-seller-view");
+  const brokerEl = $("back-broker-view");
+  const propEl   = $("match-proposal");
+  if (!buyerEl) return;
+
+  const lid = state.activeListingId || (currentScenario()?.requires?.activeListingId) || "L-2317-MAPLE";
+  const listing = listingById(lid);
+  const stage = state.backStage;
+
+  // BUYER VIEW
+  buyerEl.innerHTML = `
+    <h2 class="section">Buyer's MLS-style search</h2>
+    <div class="text-xs text-slate-400 mb-2">Filtered by buyer's <i>publicly stated</i> criteria.</div>
+    <div class="pub-line">Price max: <b>${fmtMoney(state.buyerProfile.public.priceMax)}</b></div>
+    <div class="pub-line">Areas: ${escapeHtml((state.buyerProfile.public.areas||[]).join(", "))}</div>
+    <div class="row-line my-2"></div>
+    ${ stage ? `
+      <div class="text-xs text-slate-300 mb-2">Listings shown to buyer (filter applied):</div>
+      ${ LISTINGS
+          .filter(l => l.listPrice <= (state.buyerProfile.public.priceMax || 0) + 0)
+          .slice(0, 6)
+          .map(l => `<div class="pub-line">${escapeHtml(l.address)} — ${fmtMoney(l.listPrice)}</div>`).join("") }
+      <div class="text-xs text-slate-500 mt-2 italic">Note: ${escapeHtml(listing.address)} is <b>NOT</b> in buyer's results — listed at ${fmtMoney(listing.listPrice)}, above their public max.</div>
+    ` : `<div class="text-slate-500 italic small">Click "Next step" to populate.</div>` }
+  `;
+
+  // SELLER VIEW
+  sellerEl.innerHTML = `
+    <h2 class="section">Seller's listing dashboard</h2>
+    <div class="text-xs text-slate-400 mb-2">What the seller sees about their own listing.</div>
+    <div class="pub-line">Listing: ${escapeHtml(listing.address)} @ ${fmtMoney(listing.listPrice)}</div>
+    <div class="pub-line">Days on market: <b>${listing.daysOnMarket}</b></div>
+    <div class="pub-line">Showings (last 14d): <b>3</b></div>
+    <div class="pub-line">Offers received: <b>0</b></div>
+    <div class="row-line my-2"></div>
+    ${ stage ? `
+      <div class="text-xs text-slate-300">Public buyer interest (sanitized):</div>
+      <div class="pub-line">~ ${LISTINGS.length * 7} unique impressions, 12 saves, 3 tours.</div>
+      <div class="text-xs text-slate-500 mt-2 italic">No buyer is currently shown matching the listing publicly. Seller anxiety rising as DOM grows.</div>
+    ` : `<div class="text-slate-500 italic small">Click "Next step" to populate.</div>` }
+  `;
+
+  // BROKER VIEW
+  if (!stage) {
+    brokerEl.innerHTML = `<div class="text-slate-500 italic small">Click "Next step" to reveal the broker's confidential ledger.</div>`;
+  } else {
+    const conf = state.buyerProfile.confidential;
+    const sellerC = listing.seller;
+    brokerEl.innerHTML = `
+      <h2 class="section">Buyer side (private)</h2>
+      <div class="priv-line">True ceiling: <b>${fmtMoney(conf.trueCeiling)}</b> (vs. public ${fmtMoney(state.buyerProfile.public.priceMax)})</div>
+      <div class="priv-line">Timeline pressure: ${escapeHtml(conf.timelineMotivation || "—")}</div>
+      <div class="priv-line">Hidden area pref: ${escapeHtml(conf.hiddenAreaPreference || "—")}</div>
+      <div class="priv-line">Behavioral: <b>${(state.buyerProfile.behavioralSignals||[]).length}</b> signals · intent score <b>${state.buyerProfile.intentToBuyScore}/100</b></div>
+
+      <div class="row-line my-2"></div>
+
+      <h2 class="section">Seller side (private)</h2>
+      <div class="priv-line">Motivation: ${escapeHtml(sellerC.motivation)} — ${escapeHtml(sellerC.motivationDetail || "")}</div>
+      <div class="priv-line">Urgency: <b>${sellerC.urgency}/100</b></div>
+      <div class="priv-line">True floor: <b>${fmtMoney(sellerC.trueFloor)}</b> (vs. list ${fmtMoney(listing.listPrice)})</div>
+      <div class="priv-line">Flexibility: ${escapeHtml((sellerC.flexibility||[]).join(" · "))}</div>
+
+      ${ stage === "show_overlap" || stage === "show_proposal" || stage === "show_disclosed" ? `
+        <div class="row-line my-2"></div>
+        <h2 class="section">Cross-side overlap</h2>
+        <div class="priv-line">Public overlap (max ${fmtMoney(state.buyerProfile.public.priceMax)} vs. list ${fmtMoney(listing.listPrice)}): <b style="color:#f1bcbc">none</b></div>
+        <div class="priv-line">Confidential overlap (ceiling ${fmtMoney(conf.trueCeiling)} vs. floor ${fmtMoney(sellerC.trueFloor)}): <b style="color:#b8f1cc">${fmtMoney(conf.trueCeiling - sellerC.trueFloor)} window</b></div>
+        <div class="priv-line">Timing: buyer must close by Sept 15 · seller must vacate by Sept 1 · <b style="color:#b8f1cc">aligned</b></div>
+      ` : "" }
+    `;
+  }
+
+  // PROPOSAL
+  if (state.matchProposal && (stage === "show_proposal" || stage === "show_disclosed")) {
+    const mp = state.matchProposal;
+    propEl.innerHTML = `
+      <div class="deal-prop">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold">Proposed terms · ${escapeHtml(listing.address)}</div>
+          <span class="badge badge-match">cross-side match</span>
+        </div>
+        <div class="grid md:grid-cols-2 gap-3 mt-2 text-sm">
+          <div>
+            <div class="text-[11px] uppercase tracking-wide text-slate-400">Price &amp; close</div>
+            <div>${fmtMoney(mp.price)} · close window ${escapeHtml(mp.closeWindow)}</div>
+            <div class="text-[11px] uppercase tracking-wide text-slate-400 mt-2">Terms</div>
+            <ul class="list-disc pl-5 text-[12px] text-slate-300">
+              ${mp.terms.map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+            </ul>
+          </div>
+          <div>
+            <div class="text-[11px] uppercase tracking-wide text-slate-400">What broker says to buyer</div>
+            <div class="pub-line">${escapeHtml(mp.forBuyer)}</div>
+            <div class="text-[11px] uppercase tracking-wide text-slate-400 mt-2">What broker says to seller</div>
+            <div class="pub-line">${escapeHtml(mp.forSeller)}</div>
+            <div class="text-[11px] uppercase tracking-wide text-slate-400 mt-2">Why this works (private to broker)</div>
+            <div class="priv-line">${escapeHtml(mp.why)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (stage === "show_disclosed") {
+    // Already shown above
+  } else if (stage) {
+    propEl.innerHTML = `<div class="text-slate-500 italic small">Continuing analysis — click <span class="kbd">Next step</span> to advance.</div>`;
+  }
+}
+
+// =====================================================================
+// RENDER — MODE INDICATORS & GLOBAL
+// =====================================================================
+function renderModeIndicators() {
+  for (const view of ["buyer", "seller"]) {
+    const el = $("mode-indicator-" + view);
+    if (!el) continue;
+    if (state.mode === "scripted") {
+      el.textContent = `scripted · ${currentScenario()?.title || ""}`;
+      el.className = "chip";
+    } else if (state.proxyUrl) {
+      el.textContent = "live · via shared proxy";
+      el.className = "chip chip-on";
+    } else if (state.apiKey) {
+      el.textContent = "live · your API key";
+      el.className = "chip chip-on";
+    } else {
+      el.textContent = "live · NO PROXY OR KEY";
+      el.className = "chip chip-warn";
+    }
+  }
+}
+
+function renderAll() {
+  for (const v of ["buyer", "seller", "back"]) renderMessages(v);
+  renderBuyerProfile();
+  renderListingFeed();
+  renderSellerView();
+  renderBackOffice();
+  renderModeIndicators();
+}
+
+// =====================================================================
+// SCRIPTED FLOW
+// =====================================================================
+function applyStep(step) {
+  if (step.profileUpdates) {
+    for (const [path, val] of Object.entries(step.profileUpdates)) {
+      setNested(state.buyerProfile, path, val);
+    }
+  }
+  if (step.intentDelta) {
+    state.buyerProfile.intentToBuyScore = Math.max(0, Math.min(100, state.buyerProfile.intentToBuyScore + step.intentDelta));
+    state.buyerProfile.intentTrend.push(state.buyerProfile.intentToBuyScore);
+  }
+  if (step.signals) {
+    for (const s of step.signals) {
+      state.buyerProfile.behavioralSignals.push({ ts: Date.now(), ...s });
+    }
+  }
+  if (step.feedback) {
+    for (const f of step.feedback) {
+      state.feedback[f.listingId] = { rating: f.rating, notes: f.notes };
+      state.buyerProfile.feedback.push(f);
+    }
+  }
+  if (step.listingHighlights) {
+    state.listingHighlights = step.listingHighlights;
+  }
+  if (step.sellerProfile) {
+    for (const [path, val] of Object.entries(step.sellerProfile)) {
+      setNested(state.sellerProfile, path, val);
+    }
+  }
+  if (step.matchProposal) {
+    state.matchProposal = step.matchProposal;
+  }
+  if (step.backStep) {
+    state.backStage = step.backStep;
+  }
+}
+
+function advanceScripted() {
+  const sc = currentScenario();
+  if (!sc) return;
+  const step = sc.steps[state.stepIdx];
+  if (!step) {
+    state.messages[state.view].push({ role: "system", text: "End of scenario. Pick another or hit Reset." });
+    renderAll();
+    return;
+  }
+  // Apply state changes BEFORE rendering (so the message mentions the right state)
+  applyStep(step);
+
+  if (step.broker) state.messages[state.view].push({ role: "broker", text: step.broker });
+  // Push behavioral signal markers as small messages too (for context in chat)
+  if (step.signals) {
+    for (const s of step.signals) {
+      state.messages[state.view].push({ role: "signal", text: `${s.weight ? '['+s.weight+'] ' : ''}${s.signal}` });
+    }
+  }
+  renderAll();
+  if (step.user) {
+    setTimeout(() => {
+      state.messages[state.view].push({ role: "user", text: step.user });
+      renderMessages(state.view);
+    }, 350);
+  }
+  state.stepIdx++;
+}
+
+// =====================================================================
+// LIVE CLAUDE FLOW (inherits proxy/byo-key plumbing from AeroBroker)
+// =====================================================================
+async function sendLive(view, userText) {
+  const usingProxy = !!state.proxyUrl;
+  if (!usingProxy && !state.apiKey) {
+    state.messages[view].push({ role: "system", text: "Live mode needs a proxy URL or API key. Open Settings." });
+    renderMessages(view);
+    return;
+  }
+  state.messages[view].push({ role: "user", text: userText });
+  state.messages[view].push({ role: "thinking", text: "" });
+  renderMessages(view);
+
+  const apiMessages = state.messages[view]
+    .filter(m => m.role === "user" || m.role === "broker")
+    .map(m => ({ role: m.role === "broker" ? "assistant" : "user", content: m.text }));
+
+  const fullSystemPrompt = state.systemPrompt
+    + "\n\n# LISTING CATALOG\n" + JSON.stringify(LISTINGS, null, 2)
+    + "\n\n# CURRENT BUYER PROFILE\n" + JSON.stringify(state.buyerProfile, null, 2)
+    + "\n\n# CURRENT SELLER PROFILE\n" + JSON.stringify(state.sellerProfile, null, 2)
+    + "\n\n# ACTIVE VIEW\n" + view;
+
+  const url = usingProxy ? state.proxyUrl : "https://api.anthropic.com/v1/messages";
+  const headers = usingProxy
+    ? { "content-type": "application/json" }
+    : { "x-api-key": state.apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true", "content-type": "application/json" };
+
+  let text = "";
+  try {
+    const resp = await fetch(url, {
+      method: "POST", headers,
+      body: JSON.stringify({ model: state.model, max_tokens: 1500, system: fullSystemPrompt, messages: apiMessages })
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      let parsed = null; try { parsed = JSON.parse(errText); } catch {}
+      throw new Error((usingProxy ? "Proxy " : "API ") + "error " + resp.status + ": " + (parsed?.error || errText.slice(0, 300)));
+    }
+    const data = await resp.json();
+    text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+  } catch (e) {
+    state.messages[view] = state.messages[view].filter(m => m.role !== "thinking");
+    state.messages[view].push({ role: "system", text: "Live call failed: " + e.message });
+    renderMessages(view);
+    return;
+  }
+  state.messages[view] = state.messages[view].filter(m => m.role !== "thinking");
+
+  let display = text;
+  const updateRe = /<UPDATE>([\s\S]*?)<\/UPDATE>/g;
+  let m;
+  while ((m = updateRe.exec(text)) !== null) {
+    try {
+      const obj = JSON.parse(m[1].trim());
+      applyStep({
+        profileUpdates: obj.profileUpdates,
+        intentDelta: obj.intentDelta,
+        signals: obj.signals,
+        feedback: obj.feedback,
+        listingHighlights: obj.listingHighlights,
+        sellerProfile: obj.sellerProfile,
+        matchProposal: obj.matchProposal,
+        backStep: obj.backStep
+      });
+    } catch (err) { /* ignore parse errors */ }
+  }
+  display = display.replace(updateRe, "").trim();
+
+  state.messages[view].push({ role: "broker", text: display || "(no visible content)" });
+  renderAll();
+}
+
+// =====================================================================
+// VIEW SWITCHING / SCENARIO PICKING
+// =====================================================================
+function setView(view) {
+  state.view = view;
+  for (const v of ["buyer", "seller", "back"]) {
+    $("view-" + v).classList.toggle("active", v === view);
+    $("view-" + v + "-pane").classList.toggle("active", v === view);
+  }
+  renderAll();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  $("mode-scripted").classList.toggle("active", mode === "scripted");
+  $("mode-live").classList.toggle("active",     mode === "live");
+  for (const v of ["buyer", "seller"]) {
+    $("advance-btn-" + v).classList.toggle("hidden", mode !== "scripted");
+    $("user-input-" + v).classList.toggle("hidden",   mode !== "live");
+    $("send-btn-" + v).classList.toggle("hidden",     mode !== "live");
+  }
+  renderModeIndicators();
+}
+
+function setScenario(key) {
+  state.scenarioKey = key;
+  resetAll(true);
+  const sc = currentScenario();
+  if (sc?.view) setView(sc.view);
+  if (sc?.requires?.activeListingId) state.activeListingId = sc.requires.activeListingId;
+  state.messages[state.view].push({ role: "system", text: `Scenario: ${sc.title}. Click "Next message" or "Next step" to walk it.` });
+  renderAll();
+}
+
+function resetAll(keepMode = false) {
+  state.stepIdx = 0;
+  state.messages = { buyer: [], seller: [], back: [] };
+  state.buyerProfile = emptyBuyerProfile();
+  state.sellerProfile = emptySellerProfile();
+  state.activeListingId = null;
+  state.listingHighlights = [];
+  state.feedback = {};
+  state.matchProposal = null;
+  state.backStage = null;
+  if (!keepMode) setMode("scripted");
+  renderAll();
+}
+
+// =====================================================================
+// SETTINGS
+// =====================================================================
+function openSettings() {
+  $("proxy-url").value = state.proxyUrl;
+  $("api-key").value = state.apiKey;
+  $("api-model").value = state.model;
+  $("system-prompt").value = state.systemPrompt;
+  $("settings-modal").classList.remove("hidden");
+}
+function closeSettings() { $("settings-modal").classList.add("hidden"); }
+function saveSettings() {
+  state.proxyUrl = $("proxy-url").value.trim();
+  state.apiKey   = $("api-key").value.trim();
+  state.model    = $("api-model").value.trim() || "claude-sonnet-4-6";
+  state.systemPrompt = $("system-prompt").value;
+  closeSettings();
+  if (state.mode === "live") setMode("live");
+  renderModeIndicators();
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+function init() {
+  // Populate scenario picker
+  const sel = $("scenario-picker");
+  for (const [k, sc] of Object.entries(SCENARIOS)) {
+    const opt = document.createElement("option");
+    opt.value = k; opt.textContent = sc.title;
+    sel.appendChild(opt);
+  }
+  sel.value = state.scenarioKey;
+
+  // View tabs
+  $("view-buyer").addEventListener("click",  () => setView("buyer"));
+  $("view-seller").addEventListener("click", () => setView("seller"));
+  $("view-back").addEventListener("click",   () => setView("back"));
+
+  // Mode toggles
+  $("mode-scripted").addEventListener("click", () => setMode("scripted"));
+  $("mode-live").addEventListener("click",     () => setMode("live"));
+
+  sel.addEventListener("change", e => setScenario(e.target.value));
+  $("reset-btn").addEventListener("click",     () => resetAll(true));
+  $("settings-btn").addEventListener("click",  openSettings);
+  $("settings-close").addEventListener("click", closeSettings);
+  $("settings-save").addEventListener("click",  saveSettings);
+
+  // Per-view advance/send wiring
+  for (const v of ["buyer", "seller"]) {
+    $("advance-btn-" + v).addEventListener("click", advanceScripted);
+    $("send-btn-" + v).addEventListener("click", () => {
+      const inp = $("user-input-" + v);
+      const t = inp.value.trim();
+      if (!t) return;
+      inp.value = "";
+      sendLive(v, t);
+    });
+    $("user-input-" + v).addEventListener("keydown", e => {
+      if (e.key === "Enter") $("send-btn-" + v).click();
+    });
+  }
+  // Back-office advance is shared with scripted; reuses advanceScripted but the active "view" in state should be "back" while it's active
+  $("advance-btn-back").addEventListener("click", () => {
+    // Force view alignment in case user pressed it without switching
+    if (state.view !== "back") setView("back");
+    advanceScripted();
+  });
+
+  // Seed
+  const sc = currentScenario();
+  state.messages[state.view].push({ role: "system", text: `Scenario: ${sc.title}. Click "Next message" to walk the conversation.` });
+  renderAll();
+}
+
+init();
+</script>
+</body>
+</html>

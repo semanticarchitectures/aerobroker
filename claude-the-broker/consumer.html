@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ClaudeTheBroker — find your next home</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root {
+    --bg: #f7f4ee;
+    --bg-card: #ffffff;
+    --ink: #2a2823;
+    --ink-soft: #6b6760;
+    --line: #e6e0d4;
+    --accent: #c2410c;
+    --accent-soft: #fff1ea;
+    --bubble-user: #efe7d8;
+    --listing-border: #d9d0c0;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: flex; flex-direction: column;
+    max-width: 760px; margin: 0 auto;
+    min-height: 100vh; padding: 0 16px;
+  }
+  header.top {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 0 12px 0;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+  }
+  .logo { font-size: 20px; font-weight: 600; display:flex; align-items:center; gap:8px; }
+  .tagline { color: var(--ink-soft); font-size: 12px; }
+  .gear { margin-left: auto; background: transparent; border:0; color: var(--ink-soft); cursor: pointer; padding: 6px 8px; border-radius: 8px; font-size: 13px; }
+  .gear:hover { background: #efe7d8; color: var(--ink); }
+
+  main.chat {
+    flex: 1; display: flex; flex-direction: column; gap: 18px;
+    padding: 22px 0 24px 0;
+  }
+  .msg-row { display: flex; gap: 10px; }
+  .msg-row.user { justify-content: flex-end; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; background: #2a2823; color: #f7f4ee;
+  }
+  .bubble {
+    max-width: 92%;
+    padding: 2px 0; line-height: 1.55;
+    color: var(--ink); font-size: 15px;
+  }
+  .bubble.user {
+    background: var(--bubble-user); border-radius: 14px; padding: 10px 14px;
+    max-width: 75%;
+  }
+  .bubble .meta { font-size: 11px; color: var(--ink-soft); margin-bottom: 4px; }
+  .listing-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+  @media (min-width: 600px) { .listing-grid.cols-2 { grid-template-columns: 1fr 1fr; } }
+  .listing-card {
+    background: var(--bg-card);
+    border: 1px solid var(--listing-border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.02);
+    cursor: pointer;
+    transition: border-color .15s, transform .1s;
+  }
+  .listing-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .listing-card .addr { font-weight: 600; font-size: 14px; }
+  .listing-card .neigh { font-size: 12px; color: var(--ink-soft); }
+  .listing-card .price { font-weight: 600; font-size: 16px; color: var(--accent); margin-top: 6px; }
+  .listing-card .stats { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .listing-card .desc { font-size: 13px; color: var(--ink); margin-top: 6px; }
+  .listing-card .why { font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 6px 8px; border-radius: 6px; margin-top: 8px; }
+  .composer-wrap {
+    position: sticky; bottom: 0; background: var(--bg);
+    padding: 8px 0 16px 0; border-top: 1px solid transparent;
+  }
+  .composer {
+    display: flex; gap: 8px; align-items: flex-end;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 10px 10px 10px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .composer:focus-within { border-color: var(--accent); }
+  .composer textarea {
+    flex: 1; resize: none; border: 0; outline: none; background: transparent;
+    color: var(--ink); font: inherit; line-height: 1.5; max-height: 200px; padding: 4px 0;
+  }
+  .send {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #fff;
+    border: 0; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .send:disabled { opacity: .4; cursor: not-allowed; }
+  .disclaimer { text-align: center; color: var(--ink-soft); font-size: 11px; padding: 4px 0 0 0; }
+  .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft); margin: 0 1px; animation: tdot 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: .15s; }
+  .typing-dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes tdot { 0%,80%,100%{ transform: translateY(0); opacity:.3 } 40%{ transform: translateY(-3px); opacity:1 } }
+
+  /* Settings modal */
+  .modal { position: fixed; inset:0; background: rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal-card { background:#fff; border:1px solid var(--line); border-radius:14px; max-width: 540px; width: calc(100% - 32px); padding: 20px; color: var(--ink); }
+  .modal-card label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; margin-top: 12px; }
+  .modal-card input, .modal-card textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; color: var(--ink); background: #fff;
+  }
+  .modal-card textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+  .modal-card .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  .btn { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; font-size: 13px; }
+  .btn-primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .err {
+    background:#fff0f0; border:1px solid #f3c8c8; color:#9a1a1a; border-radius: 8px; padding: 8px 10px; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <div class="logo">🏡 ClaudeTheBroker</div>
+      <div class="tagline">A patient broker for buying and selling homes</div>
+    </div>
+    <button class="gear" id="gear-btn" title="Advanced settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <main class="chat" id="chat"></main>
+
+  <div class="composer-wrap">
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Tell me about what you're looking for…" autofocus></textarea>
+      <button id="send" class="send" title="Send" aria-label="Send">↑</button>
+    </div>
+    <div class="disclaimer">Prototype · mock listings · responses generated by Claude</div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="flex items-center justify-between" style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-weight:600">Advanced settings</div>
+      <button id="settings-close" class="btn">✕</button>
+    </div>
+    <p style="font-size:12px; color:var(--ink-soft); margin-top:8px">
+      Most people don't need to change these. They're here so you can re-point the chat at a different proxy or tweak the broker's system prompt.
+    </p>
+    <label>Backend proxy URL</label>
+    <input id="proxy-url" type="text" placeholder="https://..." autocomplete="off" />
+    <label>Model</label>
+    <input id="api-model" type="text" />
+    <label>System prompt</label>
+    <textarea id="system-prompt" rows="8"></textarea>
+    <div class="actions">
+      <button id="settings-reset" class="btn">Reset to defaults</button>
+      <button id="settings-save"  class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIG  — proxy URL baked in. No API-key fallback in this UI.
+// =====================================================================
+const DEFAULT_PROXY_URL = "https://aerobroker-proxy.kevin-g-kelly.workers.dev/v1/messages";
+const DEFAULT_MODEL = "claude-sonnet-4-6";
+
+// =====================================================================
+// LISTING DATA — same catalog as the design-tool version
+// =====================================================================
+const LISTINGS = [
+  { id:"L-2317-MAPLE", address:"2317 Maple Ave", neighborhood:"Hyde Park", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2, sqft:1820, yearBuilt:1948,
+    listPrice:625000, daysOnMarket:56, schoolRating:8, walkScore:78,
+    publicFeatures:["Updated kitchen (2022)","Original hardwoods","Detached garage","Finished basement"],
+    publicDescription:"Charming Hyde Park bungalow on a leafy block — recent kitchen update, original details preserved. Walk to coffee, restaurants, and the trail."
+  },
+  { id:"L-1108-FLINT", address:"1108 Flint Rock Ln", neighborhood:"Bouldin Creek", city:"Austin", state:"TX",
+    type:"single-family", beds:4, baths:3, sqft:2350, yearBuilt:2008,
+    listPrice:749000, daysOnMarket:18, schoolRating:7, walkScore:84,
+    publicFeatures:["Open plan","Primary on main","Backyard pool"],
+    publicDescription:"Modern Bouldin home with primary suite on main, backyard pool, and EV-ready garage."
+  },
+  { id:"L-805-CRESTRIDGE", address:"805 Crestridge Dr", neighborhood:"Allandale", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2, sqft:1640, yearBuilt:1962,
+    listPrice:575000, daysOnMarket:22, schoolRating:9, walkScore:62,
+    publicFeatures:["Cul-de-sac","Big yard","Workshop in garage"],
+    publicDescription:"Mid-century ranch on a quiet cul-de-sac, big yard, top-rated schools."
+  },
+  { id:"L-3412-COVE", address:"3412 Cove Park Cir", neighborhood:"Mueller", city:"Austin", state:"TX",
+    type:"townhome", beds:3, baths:2.5, sqft:1780, yearBuilt:2018,
+    listPrice:642000, daysOnMarket:7, schoolRating:8, walkScore:89,
+    publicFeatures:["Rooftop deck","2-car garage","HOA park access"],
+    publicDescription:"Mueller townhome with rooftop deck and easy walks to all the parks."
+  },
+  { id:"L-512-WEST-30", address:"512 W 30th St", neighborhood:"West Campus", city:"Austin", state:"TX",
+    type:"condo", beds:2, baths:2, sqft:1140, yearBuilt:2014,
+    listPrice:419000, daysOnMarket:41, schoolRating:6, walkScore:95,
+    publicFeatures:["Walk to UT","Pool","Gated"],
+    publicDescription:"Walk-to-campus condo, in-unit laundry, gated complex."
+  },
+  { id:"L-9-ROSE", address:"9 Rose Hollow Way", neighborhood:"Tarrytown", city:"Austin", state:"TX",
+    type:"single-family", beds:4, baths:3.5, sqft:3100, yearBuilt:1996,
+    listPrice:1450000, daysOnMarket:12, schoolRating:10, walkScore:51,
+    publicFeatures:["Renovated 2021","Office + media room","Pool"],
+    publicDescription:"Tarrytown classic, renovated top to bottom in 2021."
+  },
+  { id:"L-1740-PALM", address:"1740 Palm Park Dr", neighborhood:"Cherrywood", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2, sqft:1480, yearBuilt:1955,
+    listPrice:549000, daysOnMarket:30, schoolRating:7, walkScore:73,
+    publicFeatures:["Bungalow charm","Walk to coffee","Detached studio"],
+    publicDescription:"Cherrywood bungalow with detached studio — perfect for WFH."
+  },
+  { id:"L-2200-FOSTER", address:"2200 Foster Ln", neighborhood:"Crestview", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2, sqft:1720, yearBuilt:1958,
+    listPrice:615000, daysOnMarket:4, schoolRating:9, walkScore:70,
+    publicFeatures:["Recently renovated","Quiet street","Detached garage"],
+    publicDescription:"Move-in-ready Crestview ranch on a quiet street — fresh paint, new floors."
+  },
+  { id:"L-77-SHADY", address:"77 Shady Hollow Ct", neighborhood:"South Lamar", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2.5, sqft:1980, yearBuilt:2010,
+    listPrice:695000, daysOnMarket:60, schoolRating:7, walkScore:81,
+    publicFeatures:["Modern build","Two-car garage","Office nook"],
+    publicDescription:"South Lamar modern with office, two-car garage, and a tucked-away cul-de-sac."
+  },
+  { id:"L-901-BARTON", address:"901 Barton Hills Dr #14", neighborhood:"Barton Hills", city:"Austin", state:"TX",
+    type:"condo", beds:2, baths:2, sqft:1320, yearBuilt:1982,
+    listPrice:489000, daysOnMarket:25, schoolRating:8, walkScore:78,
+    publicFeatures:["Greenbelt access","Pool","Quiet building"],
+    publicDescription:"Barton Hills condo with greenbelt steps from your door."
+  },
+  { id:"L-433-KOENIG", address:"433 Koenig Park Ave", neighborhood:"Brentwood", city:"Austin", state:"TX",
+    type:"single-family", beds:3, baths:2, sqft:1610, yearBuilt:1953,
+    listPrice:599000, daysOnMarket:38, schoolRating:8, walkScore:75,
+    publicFeatures:["Hyde Park-adjacent","Updated bath","Big trees"],
+    publicDescription:"Brentwood charmer near Hyde Park."
+  },
+  { id:"L-1155-EAST-7", address:"1155 E 7th St", neighborhood:"East Austin", city:"Austin", state:"TX",
+    type:"single-family", beds:4, baths:3, sqft:2240, yearBuilt:2019,
+    listPrice:875000, daysOnMarket:10, schoolRating:6, walkScore:88,
+    publicFeatures:["New construction","Roof deck","Two-car garage"],
+    publicDescription:"Modern East Austin build with roof deck and city skyline view."
+  }
+];
+
+// =====================================================================
+// WELCOME + SYSTEM PROMPT
+// =====================================================================
+const WELCOME = `Hi — I'm Claude. I help with buying and selling homes.
+
+I work a little differently than most agents. I'll ask questions to understand what you really want — not just check boxes on a search filter. Things you tell me in confidence (your true budget ceiling, why you want to move, neighborhoods you don't want to publicly target) stay with me; I won't surface them to the other side.
+
+What's on your mind? Tell me a little about your situation — buying, selling, just thinking — and we'll go from there.`;
+
+function defaultSystemPrompt() {
+  return `You are Claude, a residential real estate broker working as an intermediary between buyers and sellers in Austin, TX.
+
+Your defining feature is **asymmetric information stewardship**. Each side reveals things to you in confidence. You hold both ledgers privately and use cross-sided knowledge to find matches and propose terms that neither side would find alone. You never leak private info from one side to the other.
+
+Tone:
+- Warm, patient, low-pressure. Like a thoughtful person who works in the industry, not a sales chatbot.
+- Ask one focused question at a time when eliciting. Don't barrage.
+- Distinguish public vs. confidential explicitly when the user shares something sensitive ("I'll keep that between us").
+
+When surfacing listings, end your message with a block like this on its own line:
+<LISTINGS>L-2317-MAPLE,L-433-KOENIG,L-805-CRESTRIDGE</LISTINGS>
+Only use listing IDs that exist. The frontend will render the cards inline below your message. Don't repeat the listing details in your prose — let the cards speak. Do include a short reasoning line BEFORE the LISTINGS block when you surface them, in plain language ("Here are a few that fit what you've told me so far…").
+
+When the user has told you enough that you can reasonably surface listings, surface a small set (2-5). Don't pad with weak matches.
+
+Available listing IDs: ${LISTINGS.map(l => l.id).join(", ")}.
+
+The full listing data and any tracked buyer-profile context will be supplied in the system prompt at each turn.`;
+}
+
+// =====================================================================
+// STATE
+// =====================================================================
+const STORAGE_KEY = "ctb_consumer_settings_v1";
+
+let state = {
+  messages: [],   // [{role: 'user'|'assistant'|'welcome'|'error', text}]
+  buyerProfile: { public:{}, confidential:{}, signals:[] },
+  proxyUrl: DEFAULT_PROXY_URL,
+  model: DEFAULT_MODEL,
+  systemPrompt: defaultSystemPrompt(),
+  inFlight: false
+};
+loadSettings();
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj.proxyUrl)     state.proxyUrl = obj.proxyUrl;
+      if (obj.model)        state.model = obj.model;
+      if (obj.systemPrompt) state.systemPrompt = obj.systemPrompt;
+    }
+  } catch {}
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      proxyUrl: state.proxyUrl, model: state.model, systemPrompt: state.systemPrompt
+    }));
+  } catch {}
+}
+
+// =====================================================================
+// HELPERS
+// =====================================================================
+const $ = id => document.getElementById(id);
+const fmtMoney = n => "$" + Number(n).toLocaleString();
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function listingById(id) { return LISTINGS.find(l => l.id === id); }
+
+// Render assistant text, splitting out <LISTINGS>...</LISTINGS> blocks into card grids
+function renderAssistantContent(text) {
+  // Strip <UPDATE>...</UPDATE> blocks entirely (they're machine-only)
+  text = text.replace(/<UPDATE>[\s\S]*?<\/UPDATE>/g, "").trim();
+
+  const parts = [];
+  const re = /<LISTINGS>([\s\S]*?)<\/LISTINGS>/g;
+  let lastIdx = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push({ kind:"text", text: text.slice(lastIdx, m.index) });
+    const ids = m[1].split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+    parts.push({ kind:"listings", ids });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parts.push({ kind:"text", text: text.slice(lastIdx) });
+
+  let html = "";
+  for (const p of parts) {
+    if (p.kind === "text") {
+      const t = p.text.trim();
+      if (t) html += `<div style="white-space:pre-wrap; margin-bottom:6px">${escapeHtml(t)}</div>`;
+    } else if (p.kind === "listings") {
+      const valid = p.ids.map(listingById).filter(Boolean);
+      if (valid.length === 0) continue;
+      const cols = valid.length >= 2 ? "cols-2" : "";
+      html += `<div class="listing-grid ${cols}">`;
+      for (const l of valid) {
+        html += `
+          <div class="listing-card">
+            <div class="addr">${escapeHtml(l.address)}</div>
+            <div class="neigh">${escapeHtml(l.neighborhood)} · ${l.beds}bd / ${l.baths}ba · ${(l.sqft||0).toLocaleString()} sqft</div>
+            <div class="price">${fmtMoney(l.listPrice)}</div>
+            <div class="stats">${l.daysOnMarket}d on market · school ${l.schoolRating}/10 · walk score ${l.walkScore}</div>
+            <div class="desc">${escapeHtml(l.publicDescription)}</div>
+            ${l.publicFeatures && l.publicFeatures.length ? `<div class="why">${l.publicFeatures.slice(0,3).map(escapeHtml).join(" · ")}</div>` : ""}
+          </div>`;
+      }
+      html += "</div>";
+    }
+  }
+  return html;
+}
+
+// =====================================================================
+// RENDER
+// =====================================================================
+function renderChat() {
+  const el = $("chat");
+  el.innerHTML = "";
+  // Welcome always first
+  el.appendChild(buildAssistantRow(WELCOME));
+
+  for (const m of state.messages) {
+    if (m.role === "user") {
+      const row = document.createElement("div");
+      row.className = "msg-row user";
+      row.innerHTML = `<div class="bubble user"><div>${escapeHtml(m.text)}</div></div>`;
+      el.appendChild(row);
+    } else if (m.role === "assistant") {
+      el.appendChild(buildAssistantRow(m.text, /*renderRich*/ true));
+    } else if (m.role === "thinking") {
+      const row = document.createElement("div");
+      row.className = "msg-row";
+      row.innerHTML = `
+        <div class="avatar">C</div>
+        <div class="bubble"><div class="meta">Claude</div><div><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>`;
+      el.appendChild(row);
+    } else if (m.role === "error") {
+      const row = document.createElement("div");
+      row.className = "msg-row";
+      row.innerHTML = `<div class="avatar">!</div><div class="bubble"><div class="err">${escapeHtml(m.text)}</div></div>`;
+      el.appendChild(row);
+    }
+  }
+  // Scroll
+  try { window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); } catch {}
+}
+
+function buildAssistantRow(text, renderRich = false) {
+  const row = document.createElement("div");
+  row.className = "msg-row";
+  const inner = renderRich ? renderAssistantContent(text) : `<div style="white-space:pre-wrap">${escapeHtml(text)}</div>`;
+  row.innerHTML = `<div class="avatar">C</div><div class="bubble"><div class="meta">Claude</div>${inner}</div>`;
+  return row;
+}
+
+// =====================================================================
+// SEND
+// =====================================================================
+async function send() {
+  if (state.inFlight) return;
+  const input = $("input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  autosizeInput();
+  state.messages.push({ role: "user", text });
+  state.messages.push({ role: "thinking" });
+  state.inFlight = true;
+  $("send").disabled = true;
+  renderChat();
+
+  // Build the API request
+  const history = state.messages
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => ({ role: m.role, content: m.text }));
+
+  // Inject a system-side welcome turn so Claude sees the conversation context naturally
+  // The actual "welcome" stays in the page UI but doesn't need to be in API messages.
+
+  const fullSystemPrompt = state.systemPrompt
+    + "\n\n# LISTING CATALOG\n" + JSON.stringify(LISTINGS, null, 2);
+
+  let replyText = "";
+  try {
+    const resp = await fetch(state.proxyUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: state.model,
+        max_tokens: 1500,
+        system: fullSystemPrompt,
+        messages: history
+      })
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      let parsed = null; try { parsed = JSON.parse(t); } catch {}
+      const friendly = friendlyError(resp.status, parsed?.error || t);
+      throw new Error(friendly);
+    }
+    const data = await resp.json();
+    replyText = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
+  } catch (e) {
+    state.messages = state.messages.filter(m => m.role !== "thinking");
+    state.messages.push({ role: "error", text: e.message });
+    state.inFlight = false;
+    $("send").disabled = false;
+    renderChat();
+    return;
+  }
+
+  state.messages = state.messages.filter(m => m.role !== "thinking");
+  state.messages.push({ role: "assistant", text: replyText || "(no reply)" });
+  state.inFlight = false;
+  $("send").disabled = false;
+  renderChat();
+}
+
+function friendlyError(status, raw) {
+  if (status === 429) return "I've been chatty today and hit my daily message limit for this device. Please come back tomorrow — sorry about that.";
+  if (status === 503) return "I've reached today's overall limit across everyone using this prototype. Try again tomorrow.";
+  if (status === 403) return "I can't be reached from this page right now (origin not allowed). If you're the site owner, check the proxy's ALLOWED_ORIGINS.";
+  if (status >= 500) return "I had trouble reaching my brain. Please try again in a moment.";
+  return "Something went wrong: " + (raw || "unknown error");
+}
+
+// =====================================================================
+// SETTINGS (hidden under gear; not required to use the app)
+// =====================================================================
+function openSettings() {
+  $("proxy-url").value = state.proxyUrl;
+  $("api-model").value = state.model;
+  $("system-prompt").value = state.systemPrompt;
+  $("settings-modal").classList.remove("hidden");
+}
+function closeSettings() { $("settings-modal").classList.add("hidden"); }
+function saveSettingsFromUI() {
+  state.proxyUrl = $("proxy-url").value.trim() || DEFAULT_PROXY_URL;
+  state.model = $("api-model").value.trim() || DEFAULT_MODEL;
+  state.systemPrompt = $("system-prompt").value || defaultSystemPrompt();
+  saveSettings();
+  closeSettings();
+}
+function resetSettings() {
+  state.proxyUrl = DEFAULT_PROXY_URL;
+  state.model = DEFAULT_MODEL;
+  state.systemPrompt = defaultSystemPrompt();
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  openSettings();
+}
+
+// =====================================================================
+// INPUT AUTO-SIZE
+// =====================================================================
+function autosizeInput() {
+  const el = $("input");
+  el.style.height = "auto";
+  el.style.height = Math.min(200, el.scrollHeight) + "px";
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+function init() {
+  $("gear-btn").addEventListener("click", openSettings);
+  $("settings-close").addEventListener("click", closeSettings);
+  $("settings-save").addEventListener("click", saveSettingsFromUI);
+  $("settings-reset").addEventListener("click", resetSettings);
+
+  $("send").addEventListener("click", send);
+  $("input").addEventListener("input", autosizeInput);
+  $("input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  });
+
+  renderChat();
+}
+
+init();
+</script>
+</body>
+</html>
